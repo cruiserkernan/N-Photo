@@ -1,0 +1,14 @@
+# Build output
+bin/
+obj/
+
+# IDE/editor metadata
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS artifacts
+.DS_Store
+Thumbs.db

@@ -3,12 +3,13 @@
 - Status: Draft
 - Last Updated: 2026-02-14
 - Linked Architecture Specs: `specs/architecture/ARCH-001-mvp-foundation.md`
+- Depends On: `specs/features/FEAT-000-project-bootstrap.md`
 
 ## Problem
 We need a minimal, end-to-end node set to validate graph editing, rendering, caching, and export.
 
 ## Scope
-Include only enough nodes to prove the architecture and workflow.
+Implement MVP node behavior and integrate it into the bootstrap structure from FEAT-000.
 
 ## Requirements
 - Support these node types:
@@ -26,7 +27,7 @@ Include only enough nodes to prove the architecture and workflow.
   - typed parameters with defaults
   - input/output ports
   - deterministic execution behavior for same inputs/params
-- Editor must prevent cyclic graph connections.
+- Integrate with DAG validation and command workflow provided by FEAT-000.
 
 ## Acceptance Criteria
 - A user can load an image, chain at least 4 processing nodes, and preview output.
@@ -43,4 +44,3 @@ Include only enough nodes to prove the architecture and workflow.
 ## Open Questions
 - First release parameter ranges and defaults per node.
 - Which blur algorithm to standardize for golden tests.
-

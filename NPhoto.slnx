@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/App/App.csproj" />
+    <Project Path="src/Editor.Domain/Editor.Domain.csproj" />
+    <Project Path="src/Editor.Engine/Editor.Engine.csproj" />
+    <Project Path="src/Editor.Imaging/Editor.Imaging.csproj" />
+    <Project Path="src/Editor.IO/Editor.IO.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Editor.Tests/Editor.Tests.csproj" />
+  </Folder>
+</Solution>
