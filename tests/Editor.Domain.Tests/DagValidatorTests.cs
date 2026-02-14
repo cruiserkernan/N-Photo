@@ -1,6 +1,6 @@
 using Editor.Domain.Graph;
 
-namespace Editor.Tests;
+namespace Editor.Domain.Tests;
 
 public class DagValidatorTests
 {
@@ -9,8 +9,8 @@ public class DagValidatorTests
     {
         var validator = new DagValidator();
         var graph = new NodeGraph();
-        var nodeA = new Node(NodeId.New(), "ImageInput");
-        var nodeB = new Node(NodeId.New(), "Output");
+        var nodeA = new Node(NodeId.New(), NodeTypes.Transform);
+        var nodeB = new Node(NodeId.New(), NodeTypes.Transform);
 
         graph.AddNode(nodeA);
         graph.AddNode(nodeB);

@@ -1,6 +1,6 @@
 # ARCH-001: MVP Foundation
 
-- Status: Draft
+- Status: Approved
 - Last Updated: 2026-02-14
 - Scope: Minimal architecture for a node-based photo editor (Avalonia + C#)
 
@@ -13,7 +13,7 @@
 - `App` (Avalonia UI)
 - `Editor.Domain` (pure models)
 - `Editor.Engine` (graph evaluation, tiling, cache)
-- `Editor.Imaging` (image operation kernels, CPU/Skia-backed for MVP)
+- `Editor.Imaging` (image operation kernels, SkiaSharp-backed for MVP)
 - `Editor.IO` (load/save, serialization, assets)
 - `Editor.Tests` (golden images, determinism, cache invalidation)
 
@@ -26,9 +26,10 @@
 Constraint: `Editor.Domain` must not depend on Avalonia or Skia types.
 
 ## Engine Concepts
-- `IImage`: immutable image abstraction.
+- `IImageBuffer`: backend-agnostic immutable image abstraction exposed to engine/domain boundaries.
 - `TileKey`: `(nodeId, level, x, y, quality)`.
 - `IRenderBackend`: `Evaluate(...)`, `EvaluateTile(...)`.
+- Backend seam must allow replacing SkiaSharp with Rust/C++ native backend without changing graph/command orchestration.
 - `GraphCompiler`: validates DAG, produces topological plan, stable fingerprints.
 - `Scheduler`: cancellation, rapid-change coalescing, latest request wins.
 
@@ -37,7 +38,7 @@ Constraint: `Editor.Domain` must not depend on Avalonia or Skia types.
 - Kernel metadata: halo pixels, output size, deterministic capability.
 - `TileContext`: requested rect, quality, input tile accessor, parameters.
 
-MVP backend: CPU/Skia in `Editor.Imaging` only.
+MVP backend: `SkiaSharp` in `Editor.Imaging` only.
 
 ## Cache
 - LRU `TileCache`, configurable memory budget.
@@ -47,8 +48,8 @@ MVP backend: CPU/Skia in `Editor.Imaging` only.
 ## IO
 - `IAssetStore`: asset id to path/stream.
 - `DocumentSerializer`: JSON for graph + params + asset refs.
-- `ImageLoader`: PNG/JPEG/TIFF (start minimal).
-- `ImageExporter`: final render to file.
+- `ImageLoader`: PNG/JPEG for MVP.
+- `ImageExporter`: PNG/JPEG for MVP.
 
 ## UI Integration
 - MVVM: `MainWindow`, `NodeGraphView`, `PropertyPanel`, `ViewportView`, `Toolbar`.
@@ -66,4 +67,3 @@ MVP backend: CPU/Skia in `Editor.Imaging` only.
 - Initial tile size and mip strategy.
 - Preview-to-final quality switch timing.
 - Exact serialization versioning strategy.
-

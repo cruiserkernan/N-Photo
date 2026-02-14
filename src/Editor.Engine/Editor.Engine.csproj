@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Editor.Domain\Editor.Domain.csproj" />
+    <ProjectReference Include="..\Editor.Imaging\Editor.Imaging.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

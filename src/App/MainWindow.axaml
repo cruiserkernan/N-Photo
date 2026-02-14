@@ -9,31 +9,100 @@
         Title="N-Photo"
         Width="1280"
         Height="800"
-        MinWidth="900"
-        MinHeight="600">
+        MinWidth="1100"
+        MinHeight="700">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Padding="8" Background="#F2F2F2">
+        <Border DockPanel.Dock="Top" Padding="8" Background="#EFEFEF">
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="LoadButton" Click="OnLoadClicked" Content="Load" />
-                <Button x:Name="ExportButton" Click="OnExportClicked" Content="Export" />
-                <TextBlock x:Name="StatusTextBlock"
-                           VerticalAlignment="Center"
-                           Text="Ready" />
+                <Button x:Name="LoadButton" Content="Load" Click="OnLoadClicked" />
+                <Button x:Name="ExportButton" Content="Export" Click="OnExportClicked" />
+                <Button x:Name="BuildChainButton" Content="Build 4-Node Chain" Click="OnBuildChainClicked" />
+                <Button x:Name="UndoButton" Content="Undo" Click="OnUndoClicked" />
+                <Button x:Name="RedoButton" Content="Redo" Click="OnRedoClicked" />
+                <TextBlock x:Name="StatusTextBlock" VerticalAlignment="Center" Text="Ready" />
             </StackPanel>
         </Border>
 
-        <Grid ColumnDefinitions="3*,1*" Margin="8" ColumnSpacing="8">
-            <Grid Grid.Column="0" RowDefinitions="2*,3*" RowSpacing="8">
-                <Border Grid.Row="0" BorderBrush="#D0D0D0" BorderThickness="1" Padding="12">
-                    <TextBlock x:Name="NodeGraphPlaceholderText" Text="Node Graph Area (placeholder)" />
-                </Border>
-                <Border Grid.Row="1" BorderBrush="#D0D0D0" BorderThickness="1" Padding="12">
-                    <TextBlock x:Name="ViewportPlaceholderText" Text="Viewport Area (placeholder)" />
-                </Border>
-            </Grid>
+        <Grid ColumnDefinitions="3*,4*,3*" Margin="8" ColumnSpacing="8">
+            <Border Grid.Column="0" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10">
+                    <TextBlock Text="Graph Controls" FontWeight="Bold" />
 
-            <Border Grid.Column="1" BorderBrush="#D0D0D0" BorderThickness="1" Padding="12">
-                <TextBlock x:Name="PropertyPanelPlaceholderText" Text="Property Panel (placeholder)" />
+                    <StackPanel Grid.Row="1" Spacing="6">
+                        <TextBlock Text="Add Node" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="2*,Auto" ColumnSpacing="6">
+                            <ComboBox x:Name="NodeTypeComboBox" Grid.Column="0" />
+                            <Button x:Name="AddNodeButton" Grid.Column="1" Content="Add" Click="OnAddNodeClicked" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Spacing="6">
+                        <TextBlock Text="Connect Ports" FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="2*,1*" ColumnSpacing="6">
+                            <ComboBox x:Name="FromNodeComboBox" Grid.Column="0" SelectionChanged="OnFromNodeSelectionChanged" />
+                            <ComboBox x:Name="FromPortComboBox" Grid.Column="1" />
+                        </Grid>
+                        <Grid ColumnDefinitions="2*,1*" ColumnSpacing="6">
+                            <ComboBox x:Name="ToNodeComboBox" Grid.Column="0" SelectionChanged="OnToNodeSelectionChanged" />
+                            <ComboBox x:Name="ToPortComboBox" Grid.Column="1" />
+                        </Grid>
+                        <Button x:Name="ConnectButton" Content="Connect" Click="OnConnectClicked" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="3" ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="Nodes" FontWeight="SemiBold" />
+                            <ListBox x:Name="NodeListBox" Height="140" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Edges" FontWeight="SemiBold" />
+                            <ListBox x:Name="EdgeListBox" Height="140" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Grid.Row="4"
+                               Text="Graph uses single incoming connection per input port. New connection to a port replaces its previous source."
+                               TextWrapping="Wrap"
+                               Foreground="#6B6B6B" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
+                <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                    <TextBlock Text="Viewport Preview" FontWeight="Bold" />
+                    <Border Grid.Row="1" BorderBrush="#BDBDBD" BorderThickness="1" Background="#111111">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <Image x:Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="8">
+                    <TextBlock Text="Property Panel" FontWeight="Bold" />
+
+                    <StackPanel Grid.Row="1" Spacing="4">
+                        <TextBlock Text="Node" />
+                        <ComboBox x:Name="ParameterNodeComboBox" SelectionChanged="OnParameterNodeSelectionChanged" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Spacing="4">
+                        <TextBlock Text="Parameter" />
+                        <ComboBox x:Name="ParameterNameComboBox" SelectionChanged="OnParameterNameSelectionChanged" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Spacing="4">
+                        <TextBlock Text="Value" />
+                        <TextBox x:Name="ParameterValueTextBox" Watermark="Type value and click Apply" />
+                        <Button x:Name="ApplyParameterButton" Content="Apply Parameter" Click="OnApplyParameterClicked" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="4"
+                               Text="Value format: float/int/bool/enum literal. Example: 1.25, 4, true, multiply."
+                               TextWrapping="Wrap"
+                               Foreground="#6B6B6B" />
+                </Grid>
             </Border>
         </Grid>
     </DockPanel>

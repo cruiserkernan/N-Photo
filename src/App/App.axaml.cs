@@ -19,8 +19,8 @@ public partial class App : Application
         {
             desktop.MainWindow = new MainWindow(
                 new BootstrapEditorEngine(),
-                new StubImageLoader(),
-                new StubImageExporter());
+                new SkiaImageLoader(),
+                new SkiaImageExporter());
         }
 
         base.OnFrameworkInitializationCompleted();

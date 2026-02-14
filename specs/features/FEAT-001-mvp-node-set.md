@@ -1,6 +1,6 @@
 # FEAT-001: MVP Node Set
 
-- Status: Draft
+- Status: Implemented
 - Last Updated: 2026-02-14
 - Linked Architecture Specs: `specs/architecture/ARCH-001-mvp-foundation.md`
 - Depends On: `specs/features/FEAT-000-project-bootstrap.md`
@@ -42,5 +42,21 @@ Implement MVP node behavior and integrate it into the bootstrap structure from F
 - Distributed rendering
 
 ## Open Questions
-- First release parameter ranges and defaults per node.
-- Which blur algorithm to standardize for golden tests.
+- None.
+
+## Decisions
+- Blur algorithm for MVP tests: `Gaussian`.
+- MVP graph editing UX: simple list/select/connect controls (not full drag-and-drop canvas).
+- Imaging backend for MVP node execution: `SkiaSharp`.
+- Load/export formats for MVP: `PNG` and `JPEG`.
+
+## Validation
+- `dotnet build NPhoto.slnx -c Debug` succeeds.
+- `dotnet test NPhoto.slnx -c Debug --no-build` passes (`5` tests).
+- App shell now provides:
+  - image load (`PNG`/`JPEG`)
+  - simple node add/connect workflow
+  - parameter editing
+  - undo/redo for add/connect/set parameter
+  - live preview updates
+  - export (`PNG`/`JPEG`)

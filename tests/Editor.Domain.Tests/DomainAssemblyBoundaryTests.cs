@@ -1,10 +1,8 @@
 using Editor.Domain.Graph;
-using Editor.Engine;
-using Editor.IO;
 
-namespace Editor.Tests;
+namespace Editor.Domain.Tests;
 
-public class BootstrapSmokeTests
+public class DomainAssemblyBoundaryTests
 {
     [Fact]
     public void DomainAssembly_DoesNotReferenceAvaloniaOrSkia()
@@ -17,19 +15,5 @@ public class BootstrapSmokeTests
 
         Assert.DoesNotContain(references, name => name.StartsWith("Avalonia", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(references, name => name.StartsWith("Skia", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
-    public void BootstrapContracts_AreCallable()
-    {
-        IEditorEngine engine = new BootstrapEditorEngine();
-        IImageLoader loader = new StubImageLoader();
-        IImageExporter exporter = new StubImageExporter();
-
-        engine.RequestPreviewRender();
-
-        Assert.Equal("Preview requested", engine.Status);
-        Assert.True(loader.TryLoad("input.jpg"));
-        Assert.True(exporter.TryExport("output.jpg"));
     }
 }

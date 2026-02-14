@@ -7,6 +7,11 @@
     <Project Path="src/Editor.IO/Editor.IO.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Editor.Tests/Editor.Tests.csproj" />
+    <Project Path="tests/Editor.Tests.Common/Editor.Tests.Common.csproj" />
+    <Project Path="tests/Editor.Domain.Tests/Editor.Domain.Tests.csproj" />
+    <Project Path="tests/Editor.Engine.Tests/Editor.Engine.Tests.csproj" />
+    <Project Path="tests/Editor.Imaging.Tests/Editor.Imaging.Tests.csproj" />
+    <Project Path="tests/Editor.IO.Tests/Editor.IO.Tests.csproj" />
+    <Project Path="tests/Editor.Integration.Tests/Editor.Integration.Tests.csproj" />
   </Folder>
 </Solution>
