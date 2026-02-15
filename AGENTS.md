@@ -38,6 +38,13 @@ Use this flow for every feature request:
 - If questions are unresolved, stay in planning mode and do not implement.
 - Implementation must trace back to a specific approved feature spec.
 
+## Refactoring Guidance
+- For every feature, proactively identify refactors that improve extensibility, maintainability, or architecture quality.
+- Apply refactors only when they are directly within the feature scope and support the approved behavior.
+- Avoid premature abstractions or speculative restructuring with no immediate, concrete benefit.
+- Prefer refactors that reduce current complexity, duplication, or coupling in code being touched by the feature.
+- If a larger cross-cutting overhaul would be valuable but is out of scope, document and propose it explicitly instead of implementing it implicitly.
+
 ## Status Values
 - `Draft`
 - `Approved`

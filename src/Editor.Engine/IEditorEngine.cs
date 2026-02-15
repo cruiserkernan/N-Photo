@@ -35,7 +35,7 @@ public interface IEditorEngine
 
     void SetInputImage(RgbaImage image);
 
-    bool TryRenderOutput(out RgbaImage? image, out string errorMessage);
+    bool TryRenderOutput(out RgbaImage? image, out string errorMessage, NodeId? targetNodeId = null);
 
-    void RequestPreviewRender();
+    void RequestPreviewRender(NodeId? targetNodeId = null);
 }

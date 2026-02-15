@@ -57,4 +57,37 @@ public class EditorEngineTests
         Assert.NotNull(second);
         Assert.Equal(first!.ToRgba8(), second!.ToRgba8());
     }
+
+    [Fact]
+    public void TryRenderOutput_TargetNode_RendersIntermediateNode()
+    {
+        var engine = new BootstrapEditorEngine();
+        var transform = engine.AddNode(NodeTypes.Transform);
+        var exposure = engine.AddNode(NodeTypes.ExposureContrast);
+
+        engine.Connect(engine.InputNodeId, "Image", transform, "Image");
+        engine.Connect(transform, "Image", exposure, "Image");
+        engine.Connect(exposure, "Image", engine.OutputNodeId, "Image");
+        engine.SetParameter(exposure, "Exposure", ParameterValue.Float(0.4f));
+
+        engine.SetInputImage(TestImageFactory.CreateGradient());
+
+        Assert.True(engine.TryRenderOutput(out var transformPreview, out var transformError, transform), transformError);
+        Assert.True(engine.TryRenderOutput(out var outputPreview, out var outputError), outputError);
+        Assert.NotNull(transformPreview);
+        Assert.NotNull(outputPreview);
+        Assert.NotEqual(transformPreview!.ToRgba8(), outputPreview!.ToRgba8());
+    }
+
+    [Fact]
+    public void TryRenderOutput_TargetNode_ReturnsNull_WhenNodeIsDisconnected()
+    {
+        var engine = new BootstrapEditorEngine();
+        var disconnected = engine.AddNode(NodeTypes.Transform);
+        engine.SetInputImage(TestImageFactory.CreateGradient());
+
+        Assert.False(engine.TryRenderOutput(out var image, out var errorMessage, disconnected));
+        Assert.Null(image);
+        Assert.Equal(string.Empty, errorMessage);
+    }
 }

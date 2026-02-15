@@ -6,6 +6,7 @@ namespace Editor.Engine;
 
 public sealed class BootstrapEditorEngine : IEditorEngine
 {
+    private static readonly PreviewFrame EmptyPreviewFrame = new(1, 1, new byte[] { 0, 0, 0, 255 });
     private readonly object _sync = new();
     private readonly NodeGraph _graph = new();
     private readonly IDagValidator _dagValidator = new DagValidator();
@@ -160,13 +161,13 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         RequestPreviewRender();
     }
 
-    public bool TryRenderOutput(out RgbaImage? image, out string errorMessage)
+    public bool TryRenderOutput(out RgbaImage? image, out string errorMessage, NodeId? targetNodeId = null)
     {
         lock (_sync)
         {
             try
             {
-                image = EvaluateGraph(CancellationToken.None);
+                image = EvaluateGraph(CancellationToken.None, targetNodeId);
                 _lastOutput = image?.Clone();
                 errorMessage = string.Empty;
                 return image is not null;
@@ -181,7 +182,7 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         }
     }
 
-    public void RequestPreviewRender()
+    public void RequestPreviewRender(NodeId? targetNodeId = null)
     {
         Status = "Preview requested";
 
@@ -190,7 +191,7 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         previous?.Cancel();
         previous?.Dispose();
 
-        _ = RenderPreviewAsync(nextCts.Token);
+        _ = RenderPreviewAsync(nextCts.Token, targetNodeId);
     }
 
     private void ExecuteCommand(IEditorCommand command)
@@ -203,7 +204,7 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         }
     }
 
-    private async Task RenderPreviewAsync(CancellationToken cancellationToken)
+    private async Task RenderPreviewAsync(CancellationToken cancellationToken, NodeId? targetNodeId)
     {
         try
         {
@@ -211,22 +212,31 @@ public sealed class BootstrapEditorEngine : IEditorEngine
             {
                 lock (_sync)
                 {
-                    return EvaluateGraph(cancellationToken);
+                    return EvaluateGraph(cancellationToken, targetNodeId);
                 }
             }, cancellationToken).ConfigureAwait(false);
 
-            if (cancellationToken.IsCancellationRequested || output is null)
+            if (cancellationToken.IsCancellationRequested)
             {
                 return;
             }
 
-            lock (_sync)
+            if (output is not null)
             {
-                _lastOutput = output.Clone();
+                lock (_sync)
+                {
+                    _lastOutput = output.Clone();
+                }
+
+                Status = "Preview ready";
+                PreviewUpdated?.Invoke(this, new PreviewFrame(output.Width, output.Height, output.ToRgba8()));
+                return;
             }
 
-            Status = "Preview ready";
-            PreviewUpdated?.Invoke(this, new PreviewFrame(output.Width, output.Height, output.ToRgba8()));
+            Status = targetNodeId is null
+                ? "Preview empty"
+                : $"Preview empty at node {targetNodeId}";
+            PreviewUpdated?.Invoke(this, EmptyPreviewFrame);
         }
         catch (OperationCanceledException)
         {
@@ -238,10 +248,11 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         }
     }
 
-    private RgbaImage? EvaluateGraph(CancellationToken cancellationToken)
+    private RgbaImage? EvaluateGraph(CancellationToken cancellationToken, NodeId? targetNodeId = null)
     {
         var cache = new Dictionary<NodeId, RgbaImage>();
-        return EvaluateNode(OutputNodeId, cache, cancellationToken);
+        var evaluationNodeId = targetNodeId ?? OutputNodeId;
+        return EvaluateNode(evaluationNodeId, cache, cancellationToken);
     }
 
     private RgbaImage? EvaluateNode(
