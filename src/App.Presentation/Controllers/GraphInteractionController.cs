@@ -7,9 +7,9 @@ public sealed class GraphInteractionController
     public static (Point BendA, Point BendB) ResolveOrthogonalBends(
         Point sourceAnchor,
         Point targetAnchor,
-        bool isHorizontalDominant)
+        bool horizontalFinalSegment)
     {
-        if (isHorizontalDominant)
+        if (horizontalFinalSegment)
         {
             var middleX = (sourceAnchor.X + targetAnchor.X) / 2;
             return (
@@ -23,17 +23,22 @@ public sealed class GraphInteractionController
             new Point(targetAnchor.X, middleY));
     }
 
+    public static (Point BendA, Point BendB) ResolveOrthogonalBends(
+        Point sourceAnchor,
+        Point targetAnchor,
+        GraphPortSide targetSide)
+    {
+        var horizontalFinalSegment = targetSide == GraphPortSide.Right;
+        return ResolveOrthogonalBends(sourceAnchor, targetAnchor, horizontalFinalSegment);
+    }
+
     public static Point ScreenToWorld(Point screenPoint, Vector panOffset, double zoomScale)
     {
-        return new Point(
-            (screenPoint.X - panOffset.X) / zoomScale,
-            (screenPoint.Y - panOffset.Y) / zoomScale);
+        return PanZoomController.ScreenToWorld(screenPoint, panOffset, zoomScale);
     }
 
     public static Point WorldToScreen(Point worldPoint, Vector panOffset, double zoomScale)
     {
-        return new Point(
-            (worldPoint.X * zoomScale) + panOffset.X,
-            (worldPoint.Y * zoomScale) + panOffset.Y);
+        return PanZoomController.WorldToScreen(worldPoint, panOffset, zoomScale);
     }
 }

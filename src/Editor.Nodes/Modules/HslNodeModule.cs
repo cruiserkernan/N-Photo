@@ -14,14 +14,18 @@ internal sealed class HslNodeModule : NodeModuleBase
 
     public override RgbaImage? Evaluate(Node node, INodeEvaluationContext context, CancellationToken cancellationToken)
     {
-        var input = ResolveInput(node, "Image", context, cancellationToken);
-        return input is null
-            ? null
-            : MvpNodeKernels.Hsl(
-                input,
-                node.GetParameter("HueShift").AsFloat(),
-                node.GetParameter("Saturation").AsFloat(),
-                node.GetParameter("Lightness").AsFloat());
+        var input = ResolveInput(node, NodePortNames.Image, context, cancellationToken);
+        if (input is null)
+        {
+            return null;
+        }
+
+        var processed = MvpNodeKernels.Hsl(
+            input,
+            node.GetParameter("HueShift").AsFloat(),
+            node.GetParameter("Saturation").AsFloat(),
+            node.GetParameter("Lightness").AsFloat());
+        return ApplyMaskIfPresent(node, input, processed, context, cancellationToken);
     }
 }
 

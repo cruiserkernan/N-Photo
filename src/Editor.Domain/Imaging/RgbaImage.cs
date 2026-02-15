@@ -2,14 +2,14 @@ namespace Editor.Domain.Imaging;
 
 public sealed class RgbaImage
 {
-    private readonly float[] _pixels;
+    private readonly Half[] _pixels;
 
     public RgbaImage(int width, int height)
         : this(width, height, null)
     {
     }
 
-    public RgbaImage(int width, int height, float[]? pixels)
+    public RgbaImage(int width, int height, Half[]? pixels)
     {
         if (width <= 0)
         {
@@ -24,7 +24,7 @@ public sealed class RgbaImage
         Width = width;
         Height = height;
         _pixels = pixels is null
-            ? new float[width * height * 4]
+            ? new Half[width * height * 4]
             : ValidateAndClone(pixels, width, height);
     }
 
@@ -32,7 +32,7 @@ public sealed class RgbaImage
 
     public int Height { get; }
 
-    public ReadOnlySpan<float> Pixels => _pixels;
+    public ReadOnlySpan<Half> Pixels => _pixels;
 
     public RgbaImage Clone() => new(Width, Height, _pixels);
 
@@ -40,20 +40,20 @@ public sealed class RgbaImage
     {
         var index = GetIndex(x, y);
         return new RgbaColor(
-            _pixels[index],
-            _pixels[index + 1],
-            _pixels[index + 2],
-            _pixels[index + 3]);
+            (float)_pixels[index],
+            (float)_pixels[index + 1],
+            (float)_pixels[index + 2],
+            (float)_pixels[index + 3]);
     }
 
     public void SetPixel(int x, int y, RgbaColor color)
     {
         var clamped = RgbaColor.Clamp(color);
         var index = GetIndex(x, y);
-        _pixels[index] = clamped.R;
-        _pixels[index + 1] = clamped.G;
-        _pixels[index + 2] = clamped.B;
-        _pixels[index + 3] = clamped.A;
+        _pixels[index] = (Half)clamped.R;
+        _pixels[index + 1] = (Half)clamped.G;
+        _pixels[index + 2] = (Half)clamped.B;
+        _pixels[index + 3] = (Half)clamped.A;
     }
 
     public byte[] ToRgba8()
@@ -61,7 +61,7 @@ public sealed class RgbaImage
         var bytes = new byte[_pixels.Length];
         for (var i = 0; i < _pixels.Length; i++)
         {
-            bytes[i] = (byte)Math.Round(RgbaColor.Clamp01(_pixels[i]) * 255.0f);
+            bytes[i] = (byte)Math.Round(RgbaColor.Clamp01((float)_pixels[i]) * 255.0f);
         }
 
         return bytes;
@@ -74,10 +74,10 @@ public sealed class RgbaImage
             throw new ArgumentException("Invalid byte length for RGBA8 buffer.", nameof(bytes));
         }
 
-        var pixels = new float[bytes.Length];
+        var pixels = new Half[bytes.Length];
         for (var i = 0; i < bytes.Length; i++)
         {
-            pixels[i] = bytes[i] / 255.0f;
+            pixels[i] = (Half)(bytes[i] / 255.0f);
         }
 
         return new RgbaImage(width, height, pixels);
@@ -98,14 +98,14 @@ public sealed class RgbaImage
         return (y * Width + x) * 4;
     }
 
-    private static float[] ValidateAndClone(float[] pixels, int width, int height)
+    private static Half[] ValidateAndClone(Half[] pixels, int width, int height)
     {
         if (pixels.Length != width * height * 4)
         {
             throw new ArgumentException("Invalid pixel count for RGBA image.", nameof(pixels));
         }
 
-        var clone = new float[pixels.Length];
+        var clone = new Half[pixels.Length];
         Array.Copy(pixels, clone, pixels.Length);
         return clone;
     }

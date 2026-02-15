@@ -3,6 +3,7 @@ namespace Editor.Domain.Graph;
 public static class NodeTypes
 {
     public const string ImageInput = "ImageInput";
+    public const string Elbow = "Elbow";
     public const string Transform = "Transform";
     public const string Crop = "Crop";
     public const string ExposureContrast = "ExposureContrast";

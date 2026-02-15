@@ -4,10 +4,10 @@ using Editor.Engine.Abstractions;
 
 namespace Editor.Nodes.Modules;
 
-internal sealed class OutputNodeModule : NodeModuleBase
+internal sealed class ElbowNodeModule : NodeModuleBase
 {
-    public OutputNodeModule()
-        : base(NodeTypes.Output)
+    public ElbowNodeModule()
+        : base(NodeTypes.Elbow)
     {
     }
 
@@ -16,4 +16,3 @@ internal sealed class OutputNodeModule : NodeModuleBase
         return ResolveInput(node, NodePortNames.Image, context, cancellationToken);
     }
 }
-

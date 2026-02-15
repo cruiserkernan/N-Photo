@@ -11,6 +11,12 @@ Use this flow for every feature request:
 5. Validate against acceptance criteria.
 6. Report results and update spec status.
 
+## Living Architecture Docs (Required)
+- Maintain one or more *living* architecture docs in `specs/architecture/` that represent the current system design.
+- Do not default to creating a new architecture spec per feature.
+- Update the living architecture doc(s) whenever a feature changes architecture, boundaries, or key technical decisions.
+- Create a new architecture doc only when a new major architecture area is needed and keep it living after creation.
+
 ## Bug Fix Workflow (Exception)
 For bug fixes, do not use spec-driven files. Fix bugs directly in code.
 - No architecture spec or feature spec is required for bug-only work.
@@ -19,7 +25,7 @@ For bug fixes, do not use spec-driven files. Fix bugs directly in code.
 - Update previous specs only if the bug revealed a spec gap or error that needs correction.
 
 ## Detailed Steps
-1. Create or update the relevant architecture spec in `specs/architecture/` if needed.
+1. Update the relevant living architecture doc in `specs/architecture/` (or create a new living architecture doc only for a new major area).
 2. Create or update the feature spec in `specs/features/`.
 3. Produce an implementation plan from the spec:
    - scope
@@ -45,7 +51,7 @@ For bug fixes, do not use spec-driven files. Fix bugs directly in code.
 ## Spec Rules
 - Keep specs small and testable.
 - Separate architecture decisions from feature behavior.
-- Every feature spec must link to at least one architecture spec.
+- Every feature spec must link to at least one living architecture doc.
 - Include acceptance criteria in every spec.
 - Track open questions explicitly; do not hide assumptions in code.
 - If questions are unresolved, stay in planning mode and do not implement.
@@ -67,6 +73,7 @@ For bug fixes, do not use spec-driven files. Fix bugs directly in code.
 ## Naming
 - Architecture specs: `ARCH-###-short-name.md`
 - Feature specs: `FEAT-###-short-name.md`
+- Prefer stable low-number architecture files for living docs (for example `ARCH-000-current-system-architecture.md`).
 
 ## 3rd Party Libraries
 - Use only well-maintained, widely adopted libraries with permissive licenses.

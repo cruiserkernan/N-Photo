@@ -5,5 +5,6 @@ public enum ParameterValueKind
     Float,
     Integer,
     Boolean,
-    Enum
+    Enum,
+    Color
 }

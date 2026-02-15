@@ -8,7 +8,8 @@ public sealed record NodeParameterDefinition(
     float? MaxFloat = null,
     int? MinInt = null,
     int? MaxInt = null,
-    IReadOnlyList<string>? EnumValues = null)
+    IReadOnlyList<string>? EnumValues = null,
+    string? EditorPrimitive = null)
 {
     public void Validate(ParameterValue value)
     {
@@ -72,6 +73,9 @@ public sealed record NodeParameterDefinition(
             }
             case ParameterValueKind.Boolean:
                 value.AsBoolean();
+                break;
+            case ParameterValueKind.Color:
+                _ = value.AsColor();
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported parameter kind '{Kind}'.");

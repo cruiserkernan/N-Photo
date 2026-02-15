@@ -130,6 +130,30 @@ public class EditorEngineTests
         Assert.Contains(NodeTypes.Transform, exception.Message);
     }
 
+    [Fact]
+    public void MaskInput_PortInfluencesNodeEvaluation()
+    {
+        var engine = new BootstrapEditorEngine();
+        var exposure = engine.AddNode(NodeTypes.ExposureContrast);
+        var maskInput = engine.AddNode(NodeTypes.ImageInput);
+
+        engine.Connect(engine.InputNodeId, "Image", exposure, "Image");
+        engine.Connect(maskInput, "Image", exposure, NodePortNames.Mask);
+        engine.Connect(exposure, "Image", engine.OutputNodeId, "Image");
+        engine.SetParameter(exposure, "Exposure", ParameterValue.Float(1.0f));
+
+        engine.SetInputImage(CreateSolidImage(1, 1, new RgbaColor(0.2f, 0.2f, 0.2f, 1.0f)));
+        engine.SetInputImage(maskInput, CreateSolidImage(1, 1, new RgbaColor(0.0f, 0.0f, 0.0f, 0.5f)));
+
+        Assert.True(engine.TryRenderOutput(out var image, out var error), error);
+        Assert.NotNull(image);
+
+        var pixel = image!.GetPixel(0, 0);
+        Assert.InRange(pixel.R, 0.29f, 0.31f);
+        Assert.InRange(pixel.G, 0.29f, 0.31f);
+        Assert.InRange(pixel.B, 0.29f, 0.31f);
+    }
+
     private static RgbaImage CreateSolidImage(int width, int height, RgbaColor color)
     {
         var image = new RgbaImage(width, height);

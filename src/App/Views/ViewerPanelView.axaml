@@ -14,12 +14,17 @@
             </StackPanel>
 
             <Border Grid.Row="1" Classes="viewer-surface">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Canvas x:Name="ViewerCanvas"
+                        ClipToBounds="True"
+                        Focusable="True">
+                    <Border x:Name="ViewerLayerClipHost"
+                            ClipToBounds="True">
+                        <Canvas x:Name="ViewerLayer">
                     <Image x:Name="PreviewImage"
-                           Stretch="Uniform"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center" />
-                </ScrollViewer>
+                                   Stretch="None" />
+                        </Canvas>
+                    </Border>
+                </Canvas>
             </Border>
         </Grid>
     </Border>

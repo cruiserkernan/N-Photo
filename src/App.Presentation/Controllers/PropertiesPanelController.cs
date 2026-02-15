@@ -14,19 +14,22 @@ public sealed class PropertiesPanelController
     private readonly Func<NodeId, string, string?> _resolveNodeActionDisplayText;
     private readonly Action _refreshGraphBindings;
     private readonly Action<string> _setStatus;
+    private readonly ParameterEditorPrimitiveRegistry _primitiveRegistry;
 
     public PropertiesPanelController(
         IEditorSession editorSession,
         Func<NodeId, string, Task> executeNodeActionAsync,
         Func<NodeId, string, string?> resolveNodeActionDisplayText,
         Action refreshGraphBindings,
-        Action<string> setStatus)
+        Action<string> setStatus,
+        ParameterEditorPrimitiveRegistry? primitiveRegistry = null)
     {
         _editorSession = editorSession;
         _executeNodeActionAsync = executeNodeActionAsync;
         _resolveNodeActionDisplayText = resolveNodeActionDisplayText;
         _refreshGraphBindings = refreshGraphBindings;
         _setStatus = setStatus;
+        _primitiveRegistry = primitiveRegistry ?? ParameterEditorPrimitiveRegistry.CreateDefault();
     }
 
     public void Refresh(
@@ -147,135 +150,15 @@ public sealed class PropertiesPanelController
     {
         return definition.Kind switch
         {
-            ParameterValueKind.Boolean => CreateBooleanParameterEditor(nodeId, nodeType, definition, currentValue),
-            ParameterValueKind.Enum => CreateEnumParameterEditor(nodeId, nodeType, definition, currentValue),
-            ParameterValueKind.Float or ParameterValueKind.Integer =>
-                CreateTextParameterEditor(nodeId, nodeType, definition, currentValue),
-            _ => new TextBlock
-            {
-                Classes = { "hint-text" },
-                Text = $"Unsupported parameter kind '{definition.Kind}'."
-            }
-        };
-    }
-
-    private Control CreateTextParameterEditor(
-        NodeId nodeId,
-        string nodeType,
-        NodeParameterDefinition definition,
-        ParameterValue currentValue)
-    {
-        var textBox = new TextBox
-        {
-            Text = NodeParameterEditorController.FormatParameterValue(currentValue),
-            Watermark = NodeParameterEditorController.GetParameterHint(definition)
-        };
-
-        var applyButton = new Button
-        {
-            Content = "Apply"
-        };
-
-        applyButton.Click += (_, _) =>
-        {
-            try
-            {
-                var parsedValue = NodeParameterEditorController.ParseTextParameterValue(definition, textBox.Text ?? string.Empty);
-                ApplyParameterUpdate(nodeId, nodeType, definition, parsedValue);
-            }
-            catch (Exception exception)
-            {
-                _setStatus($"Set parameter failed: {exception.Message}");
-            }
-        };
-
-        textBox.KeyDown += (_, keyEventArgs) =>
-        {
-            if (keyEventArgs.Key != Key.Enter)
-            {
-                return;
-            }
-
-            applyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            keyEventArgs.Handled = true;
-        };
-
-        var row = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            ColumnSpacing = 8
-        };
-        row.Children.Add(textBox);
-        row.Children.Add(applyButton);
-        Grid.SetColumn(applyButton, 1);
-
-        return new StackPanel
-        {
-            Spacing = 4,
-            Children =
-            {
-                new TextBlock
-                {
-                    Classes = { "section-label" },
-                    Text = NodeParameterEditorController.GetParameterLabel(definition)
-                },
-                row
-            }
-        };
-    }
-
-    private Control CreateBooleanParameterEditor(
-        NodeId nodeId,
-        string nodeType,
-        NodeParameterDefinition definition,
-        ParameterValue currentValue)
-    {
-        var checkBox = new CheckBox
-        {
-            Content = NodeParameterEditorController.GetParameterLabel(definition),
-            IsChecked = currentValue.AsBoolean()
-        };
-
-        checkBox.IsCheckedChanged += (_, _) =>
-            ApplyParameterUpdate(nodeId, nodeType, definition, ParameterValue.Boolean(checkBox.IsChecked ?? false));
-
-        return checkBox;
-    }
-
-    private Control CreateEnumParameterEditor(
-        NodeId nodeId,
-        string nodeType,
-        NodeParameterDefinition definition,
-        ParameterValue currentValue)
-    {
-        var comboBox = new ComboBox
-        {
-            ItemsSource = definition.EnumValues ?? Array.Empty<string>(),
-            SelectedItem = currentValue.AsEnum()
-        };
-
-        comboBox.SelectionChanged += (_, _) =>
-        {
-            if (comboBox.SelectedItem is not string selected)
-            {
-                return;
-            }
-
-            ApplyParameterUpdate(nodeId, nodeType, definition, ParameterValue.Enum(selected));
-        };
-
-        return new StackPanel
-        {
-            Spacing = 4,
-            Children =
-            {
-                new TextBlock
-                {
-                    Classes = { "section-label" },
-                    Text = NodeParameterEditorController.GetParameterLabel(definition)
-                },
-                comboBox
-            }
+            _ => _primitiveRegistry.Resolve(definition, currentValue)
+                .Create(
+                    new ParameterEditorPrimitiveContext(
+                        nodeId,
+                        nodeType,
+                        definition,
+                        currentValue,
+                        value => ApplyParameterUpdate(nodeId, nodeType, definition, value),
+                        _setStatus))
         };
     }
 

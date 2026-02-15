@@ -24,9 +24,18 @@
         <SolidColorBrush x:Key="Brush.NodeCard.Border">#556274</SolidColorBrush>
         <SolidColorBrush x:Key="Brush.NodeCard.BorderSelected">#65BAF7</SolidColorBrush>
         <SolidColorBrush x:Key="Brush.NodeCard.BorderDragging">#E3B672</SolidColorBrush>
-        <SolidColorBrush x:Key="Brush.Graph.Wire">#7EB1DD</SolidColorBrush>
-        <SolidColorBrush x:Key="Brush.PortHandle.Input">#4F5E70</SolidColorBrush>
-        <SolidColorBrush x:Key="Brush.PortHandle.Output">#78A9D8</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.NodeCard.Elbow.Background">#B9894A</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.NodeCard.Elbow.Border">#E0BE88</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Graph.Wire">#E9BA67</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Input.Connected">#E8C47D</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Input.Unconnected">#6D5B34</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Output.Connected">#F0C47A</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Output.Unconnected">#726245</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Mask.Connected">#7CB786</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Mask.Unconnected">#3A6442</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Border.Connected">#F6D08C</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Border.Unconnected">#2D333C</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Border.Hover">#FFF2C8</SolidColorBrush>
     </Application.Resources>
 
     <Application.Styles>

@@ -14,13 +14,17 @@ internal sealed class TransformNodeModule : NodeModuleBase
 
     public override RgbaImage? Evaluate(Node node, INodeEvaluationContext context, CancellationToken cancellationToken)
     {
-        var input = ResolveInput(node, "Image", context, cancellationToken);
-        return input is null
-            ? null
-            : MvpNodeKernels.Transform(
-                input,
-                node.GetParameter("Scale").AsFloat(),
-                node.GetParameter("RotateDegrees").AsFloat());
+        var input = ResolveInput(node, NodePortNames.Image, context, cancellationToken);
+        if (input is null)
+        {
+            return null;
+        }
+
+        var transformed = MvpNodeKernels.Transform(
+            input,
+            node.GetParameter("Scale").AsFloat(),
+            node.GetParameter("RotateDegrees").AsFloat());
+        return ApplyMaskIfPresent(node, input, transformed, context, cancellationToken);
     }
 }
 

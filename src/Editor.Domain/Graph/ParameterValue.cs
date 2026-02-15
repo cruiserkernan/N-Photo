@@ -1,3 +1,5 @@
+using Editor.Domain.Imaging;
+
 namespace Editor.Domain.Graph;
 
 public readonly record struct ParameterValue(ParameterValueKind Kind, object Value)
@@ -18,6 +20,8 @@ public readonly record struct ParameterValue(ParameterValueKind Kind, object Val
         return new(ParameterValueKind.Enum, value);
     }
 
+    public static ParameterValue Color(RgbaColor value) => new(ParameterValueKind.Color, value);
+
     public float AsFloat() => Kind == ParameterValueKind.Float
         ? (float)Value
         : throw new InvalidOperationException($"Parameter is '{Kind}', expected '{ParameterValueKind.Float}'.");
@@ -33,4 +37,8 @@ public readonly record struct ParameterValue(ParameterValueKind Kind, object Val
     public string AsEnum() => Kind == ParameterValueKind.Enum
         ? (string)Value
         : throw new InvalidOperationException($"Parameter is '{Kind}', expected '{ParameterValueKind.Enum}'.");
+
+    public RgbaColor AsColor() => Kind == ParameterValueKind.Color
+        ? (RgbaColor)Value
+        : throw new InvalidOperationException($"Parameter is '{Kind}', expected '{ParameterValueKind.Color}'.");
 }

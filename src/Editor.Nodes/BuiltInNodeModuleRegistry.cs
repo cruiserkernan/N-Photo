@@ -14,6 +14,7 @@ public sealed class BuiltInNodeModuleRegistry : INodeModuleRegistry
         Modules = new INodeModule[]
         {
             new ImageInputNodeModule(),
+            new ElbowNodeModule(),
             new TransformNodeModule(),
             new CropNodeModule(),
             new ExposureContrastNodeModule(),

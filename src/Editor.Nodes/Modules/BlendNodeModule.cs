@@ -21,11 +21,12 @@ internal sealed class BlendNodeModule : NodeModuleBase
             return baseImage ?? topImage;
         }
 
-        return MvpNodeKernels.Blend(
+        var blended = MvpNodeKernels.Blend(
             baseImage,
             topImage,
             node.GetParameter("Mode").AsEnum(),
             node.GetParameter("Opacity").AsFloat());
+        return ApplyMaskIfPresent(node, baseImage, blended, context, cancellationToken);
     }
 }
 

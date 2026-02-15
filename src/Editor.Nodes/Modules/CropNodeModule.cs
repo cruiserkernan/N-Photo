@@ -14,7 +14,7 @@ internal sealed class CropNodeModule : NodeModuleBase
 
     public override RgbaImage? Evaluate(Node node, INodeEvaluationContext context, CancellationToken cancellationToken)
     {
-        var input = ResolveInput(node, "Image", context, cancellationToken);
+        var input = ResolveInput(node, NodePortNames.Image, context, cancellationToken);
         return input is null
             ? null
             : MvpNodeKernels.Crop(
