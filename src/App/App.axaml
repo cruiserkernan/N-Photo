@@ -119,11 +119,19 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.BorderSoft}" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
         </Style>
+        <Style Selector="Border.shell-toolbar-surface">
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
 
         <Style Selector="TextBlock.toolbar-caption">
             <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="TextBlock.shell-cluster-title">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,4,0" />
         </Style>
 
         <Style Selector="Border.status-pill">

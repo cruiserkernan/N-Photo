@@ -1,8 +1,9 @@
 # ARCH-010: Node-Specific Properties Pane
 
-- Status: Implemented
+- Status: Deprecated
 - Last Updated: 2026-02-15
 - Scope: Drive properties UI from selected node type with typed editors and image-input file picking
+- Superseded By: `specs/architecture/ARCH-012-shell-redesign-and-presentation-architecture.md`
 
 ## Goals
 - Make the Properties pane reflect the currently selected node on the graph canvas.

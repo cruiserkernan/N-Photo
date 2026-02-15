@@ -25,6 +25,12 @@ public partial class TopToolbarView : UserControl
     public StackPanel NodeStripHostControl => this.FindControl<StackPanel>("NodeStripHost")
                                                 ?? throw new InvalidOperationException("NodeStripHost not found.");
 
+    public TextBox NodeSearchBoxControl => this.FindControl<TextBox>("NodeSearchBox")
+                                           ?? throw new InvalidOperationException("NodeSearchBox not found.");
+
+    public Button NodeSearchAddButtonControl => this.FindControl<Button>("NodeSearchAddButton")
+                                                ?? throw new InvalidOperationException("NodeSearchAddButton not found.");
+
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);

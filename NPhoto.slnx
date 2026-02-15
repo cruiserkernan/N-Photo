@@ -1,17 +1,24 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/App/App.csproj" />
+    <Project Path="src/App.Presentation/App.Presentation.csproj" />
+    <Project Path="src/Editor.Application/Editor.Application.csproj" />
     <Project Path="src/Editor.Domain/Editor.Domain.csproj" />
+    <Project Path="src/Editor.Engine.Abstractions/Editor.Engine.Abstractions.csproj" />
     <Project Path="src/Editor.Engine/Editor.Engine.csproj" />
     <Project Path="src/Editor.Imaging/Editor.Imaging.csproj" />
     <Project Path="src/Editor.IO/Editor.IO.csproj" />
+    <Project Path="src/Editor.Nodes/Editor.Nodes.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/App.Presentation.Tests/App.Presentation.Tests.csproj" />
+    <Project Path="tests/Editor.Application.Tests/Editor.Application.Tests.csproj" />
     <Project Path="tests/Editor.Tests.Common/Editor.Tests.Common.csproj" />
     <Project Path="tests/Editor.Domain.Tests/Editor.Domain.Tests.csproj" />
     <Project Path="tests/Editor.Engine.Tests/Editor.Engine.Tests.csproj" />
     <Project Path="tests/Editor.Imaging.Tests/Editor.Imaging.Tests.csproj" />
     <Project Path="tests/Editor.IO.Tests/Editor.IO.Tests.csproj" />
     <Project Path="tests/Editor.Integration.Tests/Editor.Integration.Tests.csproj" />
+    <Project Path="tests/Editor.Nodes.Tests/Editor.Nodes.Tests.csproj" />
   </Folder>
 </Solution>

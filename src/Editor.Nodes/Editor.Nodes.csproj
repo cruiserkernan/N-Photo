@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Editor.Domain\Editor.Domain.csproj" />
+    <ProjectReference Include="..\Editor.Engine.Abstractions\Editor.Engine.Abstractions.csproj" />
+    <ProjectReference Include="..\Editor.Imaging\Editor.Imaging.csproj" />
+  </ItemGroup>
+</Project>

@@ -6,12 +6,14 @@ public sealed class NodeTypeDefinition
         string name,
         IReadOnlyList<NodePortDefinition> inputs,
         IReadOnlyList<NodePortDefinition> outputs,
-        IReadOnlyDictionary<string, NodeParameterDefinition>? parameters = null)
+        IReadOnlyDictionary<string, NodeParameterDefinition>? parameters = null,
+        IReadOnlyList<NodeActionDefinition>? actions = null)
     {
         Name = name;
         Inputs = inputs;
         Outputs = outputs;
         Parameters = parameters ?? new Dictionary<string, NodeParameterDefinition>(StringComparer.Ordinal);
+        Actions = actions ?? Array.Empty<NodeActionDefinition>();
     }
 
     public string Name { get; }
@@ -21,6 +23,8 @@ public sealed class NodeTypeDefinition
     public IReadOnlyList<NodePortDefinition> Outputs { get; }
 
     public IReadOnlyDictionary<string, NodeParameterDefinition> Parameters { get; }
+
+    public IReadOnlyList<NodeActionDefinition> Actions { get; }
 
     public bool HasInputPort(string name) => Inputs.Any(port => string.Equals(port.Name, name, StringComparison.Ordinal));
 

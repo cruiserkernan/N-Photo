@@ -23,9 +23,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\App.Presentation\App.Presentation.csproj" />
+    <ProjectReference Include="..\Editor.Application\Editor.Application.csproj" />
     <ProjectReference Include="..\Editor.Domain\Editor.Domain.csproj" />
+    <ProjectReference Include="..\Editor.Engine.Abstractions\Editor.Engine.Abstractions.csproj" />
     <ProjectReference Include="..\Editor.Engine\Editor.Engine.csproj" />
     <ProjectReference Include="..\Editor.IO\Editor.IO.csproj" />
+    <ProjectReference Include="..\Editor.Nodes\Editor.Nodes.csproj" />
   </ItemGroup>
 
   <ItemGroup>

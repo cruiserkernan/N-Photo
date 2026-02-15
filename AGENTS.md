@@ -54,7 +54,7 @@ For bug fixes, do not use spec-driven files. Fix bugs directly in code.
 ## Refactoring Guidance
 - For every feature, proactively identify refactors that improve extensibility, maintainability, or architecture quality.
 - Apply refactors only when they are directly within the feature scope and support the approved behavior.
-- Avoid premature abstractions or speculative restructuring with no immediate, concrete benefit.
+- Make sure to always think of extensibility and future-proofing.
 - Prefer refactors that reduce current complexity, duplication, or coupling in code being touched by the feature.
 - If a larger cross-cutting overhaul would be valuable but is out of scope, document and propose it explicitly instead of implementing it implicitly.
 

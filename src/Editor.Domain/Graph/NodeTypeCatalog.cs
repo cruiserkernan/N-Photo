@@ -8,7 +8,15 @@ public static class NodeTypeCatalog
             [NodeTypes.ImageInput] = new(
                 NodeTypes.ImageInput,
                 inputs: Array.Empty<NodePortDefinition>(),
-                outputs: new[] { new NodePortDefinition("Image", PortDirection.Output) }),
+                outputs: new[] { new NodePortDefinition("Image", PortDirection.Output) },
+                actions: new[]
+                {
+                    new NodeActionDefinition(
+                        NodeActionIds.PickImageSource,
+                        "Source Image",
+                        "Choose Image...",
+                        "No image selected.")
+                }),
             [NodeTypes.Transform] = new(
                 NodeTypes.Transform,
                 inputs: new[] { new NodePortDefinition("Image", PortDirection.Input) },

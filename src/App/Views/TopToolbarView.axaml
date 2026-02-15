@@ -4,36 +4,42 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DesignWidth="1280"
-             d:DesignHeight="70"
+             d:DesignHeight="86"
              x:Class="App.Views.TopToolbarView">
-    <Border Classes="toolbar-surface">
-        <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10">
+    <Border Classes="toolbar-surface shell-toolbar-surface">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="12">
             <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="toolbar-caption shell-cluster-title" Text="File" />
                 <Button x:Name="ExportButton" Classes="toolbar-button toolbar-button-primary" Content="Export" />
-                <Button x:Name="UndoButton" Classes="toolbar-button" Content="Undo" />
-                <Button x:Name="RedoButton" Classes="toolbar-button" Content="Redo" />
             </StackPanel>
 
             <Border Grid.Column="1" Width="1" Margin="2,4" Background="{DynamicResource Brush.Chrome.BorderSoft}" />
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <TextBlock Classes="toolbar-caption" Text="Nodes" />
-                <StackPanel x:Name="NodeStripHost" Orientation="Horizontal" Spacing="4" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="toolbar-caption shell-cluster-title" Text="Edit" />
+                <Button x:Name="UndoButton" Classes="toolbar-button" Content="Undo" />
+                <Button x:Name="RedoButton" Classes="toolbar-button" Content="Redo" />
             </StackPanel>
 
-            <Grid Grid.Column="3" ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <TextBlock VerticalAlignment="Center"
-                           Classes="toolbar-caption"
-                           Text="N-Photo  |  Node Workspace" />
-                <Border Grid.Column="1"
-                        Classes="status-pill"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center">
-                    <TextBlock x:Name="StatusTextBlock"
-                               Classes="status-text"
-                               Text="Ready" />
-                </Border>
+            <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                <TextBlock VerticalAlignment="Center" Classes="toolbar-caption shell-cluster-title" Text="Node" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBox x:Name="NodeSearchBox"
+                             Width="180"
+                             Watermark="Search node type" />
+                    <Button x:Name="NodeSearchAddButton" Content="Add" MinWidth="54" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" x:Name="NodeStripHost" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" />
             </Grid>
+
+            <Border Grid.Column="4"
+                    Classes="status-pill"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center">
+                <TextBlock x:Name="StatusTextBlock"
+                           Classes="status-text"
+                           Text="Ready" />
+            </Border>
         </Grid>
     </Border>
 </UserControl>

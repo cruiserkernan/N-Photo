@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="Dock.Avalonia" Version="11.3.11.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Editor.Application\Editor.Application.csproj" />
+    <ProjectReference Include="..\Editor.Domain\Editor.Domain.csproj" />
+    <ProjectReference Include="..\Editor.Engine.Abstractions\Editor.Engine.Abstractions.csproj" />
+    <ProjectReference Include="..\Editor.IO\Editor.IO.csproj" />
+    <ProjectReference Include="..\Editor.Engine\Editor.Engine.csproj" />
+  </ItemGroup>
+</Project>

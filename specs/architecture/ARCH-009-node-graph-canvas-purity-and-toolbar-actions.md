@@ -1,8 +1,9 @@
 # ARCH-009: Node Graph Canvas Purity and Toolbar Actions
 
-- Status: Implemented
+- Status: Deprecated
 - Last Updated: 2026-02-15
 - Scope: Separate graph interaction surface from graph-management UI controls while preserving docking and node-editing behavior
+- Superseded By: `specs/architecture/ARCH-012-shell-redesign-and-presentation-architecture.md`
 
 ## Goals
 - Keep the node graph panel visually focused on the graph canvas only.
