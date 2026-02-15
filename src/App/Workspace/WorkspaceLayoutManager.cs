@@ -51,20 +51,11 @@ internal sealed class WorkspaceLayoutManager
         };
 
         Factory.InitLayout(Layout);
-
-        PanelOptions = new[]
-        {
-            new WorkspacePanelOption(WorkspacePanelId.Graph, GetPanelTitle(WorkspacePanelId.Graph)),
-            new WorkspacePanelOption(WorkspacePanelId.Viewer, GetPanelTitle(WorkspacePanelId.Viewer)),
-            new WorkspacePanelOption(WorkspacePanelId.Properties, GetPanelTitle(WorkspacePanelId.Properties))
-        };
     }
 
     public Factory Factory { get; }
 
     public RootDock Layout { get; }
-
-    public IReadOnlyList<WorkspacePanelOption> PanelOptions { get; }
 
     public bool TryDockAsTab(WorkspacePanelId sourceId, WorkspacePanelId targetId)
     {

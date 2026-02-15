@@ -1,4 +1,5 @@
 using Editor.Domain.Graph;
+using Editor.Domain.Imaging;
 using Editor.Engine;
 using Editor.Tests.Common;
 
@@ -89,5 +90,57 @@ public class EditorEngineTests
         Assert.False(engine.TryRenderOutput(out var image, out var errorMessage, disconnected));
         Assert.Null(image);
         Assert.Equal(string.Empty, errorMessage);
+    }
+
+    [Fact]
+    public void SetInputImage_NodeSpecificImages_RenderPerImageInputNode()
+    {
+        var engine = new BootstrapEditorEngine();
+        var secondInput = engine.AddNode(NodeTypes.ImageInput);
+
+        engine.Connect(secondInput, "Image", engine.OutputNodeId, "Image");
+
+        var firstImage = TestImageFactory.CreateGradient(8, 8);
+        var secondImage = CreateSolidImage(8, 8, new RgbaColor(1.0f, 0.0f, 0.0f, 1.0f));
+
+        engine.SetInputImage(firstImage);
+        engine.SetInputImage(secondInput, secondImage);
+
+        Assert.True(engine.TryRenderOutput(out var firstPreview, out var firstError, engine.InputNodeId), firstError);
+        Assert.True(engine.TryRenderOutput(out var secondPreview, out var secondError, secondInput), secondError);
+        Assert.True(engine.TryRenderOutput(out var outputPreview, out var outputError), outputError);
+
+        Assert.NotNull(firstPreview);
+        Assert.NotNull(secondPreview);
+        Assert.NotNull(outputPreview);
+        Assert.Equal(firstImage.ToRgba8(), firstPreview!.ToRgba8());
+        Assert.Equal(secondImage.ToRgba8(), secondPreview!.ToRgba8());
+        Assert.Equal(secondImage.ToRgba8(), outputPreview!.ToRgba8());
+    }
+
+    [Fact]
+    public void SetInputImage_Throws_WhenNodeIsNotImageInput()
+    {
+        var engine = new BootstrapEditorEngine();
+        var transform = engine.AddNode(NodeTypes.Transform);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            engine.SetInputImage(transform, TestImageFactory.CreateGradient()));
+
+        Assert.Contains(NodeTypes.Transform, exception.Message);
+    }
+
+    private static RgbaImage CreateSolidImage(int width, int height, RgbaColor color)
+    {
+        var image = new RgbaImage(width, height);
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                image.SetPixel(x, y, color);
+            }
+        }
+
+        return image;
     }
 }

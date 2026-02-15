@@ -13,7 +13,7 @@ public sealed class BootstrapEditorEngine : IEditorEngine
     private readonly Stack<IEditorCommand> _undoStack = new();
     private readonly Stack<IEditorCommand> _redoStack = new();
     private CancellationTokenSource? _renderCts;
-    private RgbaImage? _inputImage;
+    private readonly Dictionary<NodeId, RgbaImage> _inputImages = new();
     private RgbaImage? _lastOutput;
 
     public BootstrapEditorEngine()
@@ -59,8 +59,7 @@ public sealed class BootstrapEditorEngine : IEditorEngine
     }
 
     public IReadOnlyList<string> AvailableNodeTypes { get; } = NodeTypeCatalog.All
-        .Where(nodeType => !string.Equals(nodeType.Name, NodeTypes.ImageInput, StringComparison.Ordinal) &&
-                           !string.Equals(nodeType.Name, NodeTypes.Output, StringComparison.Ordinal))
+        .Where(nodeType => !string.Equals(nodeType.Name, NodeTypes.Output, StringComparison.Ordinal))
         .Select(nodeType => nodeType.Name)
         .OrderBy(name => name, StringComparer.Ordinal)
         .ToArray();
@@ -152,12 +151,28 @@ public sealed class BootstrapEditorEngine : IEditorEngine
 
     public void SetInputImage(RgbaImage image)
     {
+        SetInputImage(InputNodeId, image);
+    }
+
+    public void SetInputImage(NodeId nodeId, RgbaImage image)
+    {
         lock (_sync)
         {
-            _inputImage = image.Clone();
+            if (!_graph.TryGetNode(nodeId, out var node))
+            {
+                throw new InvalidOperationException($"Node '{nodeId}' was not found.");
+            }
+
+            if (!string.Equals(node.Type, NodeTypes.ImageInput, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Node '{nodeId}' is type '{node.Type}', expected '{NodeTypes.ImageInput}'.");
+            }
+
+            _inputImages[nodeId] = image.Clone();
         }
 
-        Status = "Image loaded";
+        Status = $"Image loaded for {nodeId}";
         RequestPreviewRender();
     }
 
@@ -199,8 +214,19 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         lock (_sync)
         {
             command.Execute(_graph, _dagValidator);
+            PruneInputImages();
             _undoStack.Push(command);
             _redoStack.Clear();
+        }
+    }
+
+    private void PruneInputImages()
+    {
+        var liveNodeIds = _graph.Nodes.Select(node => node.Id).ToHashSet();
+        var staleKeys = _inputImages.Keys.Where(key => !liveNodeIds.Contains(key)).ToArray();
+        foreach (var key in staleKeys)
+        {
+            _inputImages.Remove(key);
         }
     }
 
@@ -270,7 +296,7 @@ public sealed class BootstrapEditorEngine : IEditorEngine
         var node = _graph.GetNode(nodeId);
         RgbaImage? output = node.Type switch
         {
-            NodeTypes.ImageInput => _inputImage?.Clone(),
+            NodeTypes.ImageInput => _inputImages.TryGetValue(nodeId, out var image) ? image.Clone() : null,
             NodeTypes.Transform => EvaluateTransform(node, cache, cancellationToken),
             NodeTypes.Crop => EvaluateCrop(node, cache, cancellationToken),
             NodeTypes.ExposureContrast => EvaluateExposureContrast(node, cache, cancellationToken),

@@ -36,6 +36,12 @@ For bug fixes, do not use spec-driven files. Fix bugs directly in code.
    - `Implemented` after code + verification are complete
    - `Deprecated` when replaced or retired
 
+## Checks and Tests
+- Use automated tests where possible to validate behavior against specs.
+- Include unit tests for core logic and integration tests for end-to-end behavior.
+- Perform manual testing for UI/UX features or complex interactions that are difficult to automate.
+- Run app for a short period after implementation to catch any runtime issues or regressions before marking as implemented. Make sure to quit after a few seconds so that AI does not get stuck infinitely.
+
 ## Spec Rules
 - Keep specs small and testable.
 - Separate architecture decisions from feature behavior.

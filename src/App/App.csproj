@@ -27,4 +27,8 @@
     <ProjectReference Include="..\Editor.Engine\Editor.Engine.csproj" />
     <ProjectReference Include="..\Editor.IO\Editor.IO.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\Fonts\**\*.*" />
+  </ItemGroup>
 </Project>

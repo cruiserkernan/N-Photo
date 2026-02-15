@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -9,8 +10,8 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using App.Views;
 using App.Workspace;
-using Dock.Model.Core;
 using Editor.Domain.Graph;
 using Editor.Domain.Imaging;
 using Editor.Engine;
@@ -29,39 +30,70 @@ public partial class MainWindow : Window
     private const double MinZoomScale = 0.35;
     private const double MaxZoomScale = 2.5;
     private const double ZoomStepFactor = 1.1;
-    private static readonly IBrush NodeCardBackground = Brush.Parse("#2B2F36");
-    private static readonly IBrush NodeCardBorder = Brush.Parse("#8CA8C9");
-    private static readonly IBrush NodeCardSelectedBorder = Brush.Parse("#5EC0FF");
-    private static readonly IBrush NodeCardDragBorder = Brush.Parse("#F5C26B");
-    private static readonly IBrush NodeCardTitleForeground = Brush.Parse("#F2F2F2");
-    private static readonly IBrush NodeCardDetailForeground = Brush.Parse("#B8C2CE");
-    private static readonly IBrush WireStroke = Brush.Parse("#87A7CB");
-    private static readonly IBrush WireArrowFill = Brush.Parse("#87A7CB");
+    private const double PortHandleSize = 10;
+    private const double PortHandleVerticalSpacing = 16;
+    private const double PortSnapDistancePixels = 18;
     private const double WireThickness = 2;
     private const double WireArrowLength = 9;
     private const double WireArrowWidth = 5;
     private readonly IEditorEngine _editorEngine;
     private readonly IImageLoader _imageLoader;
     private readonly IImageExporter _imageExporter;
+    private readonly IBrush _nodeCardBackground;
+    private readonly IBrush _nodeCardBorder;
+    private readonly IBrush _nodeCardSelectedBorder;
+    private readonly IBrush _nodeCardDragBorder;
+    private readonly IBrush _nodeCardTitleForeground;
+    private readonly IBrush _nodeCardDetailForeground;
+    private readonly IBrush _wireStroke;
+    private readonly IBrush _wireArrowFill;
     private readonly Dictionary<NodeId, Node> _nodeLookup = new();
     private readonly Dictionary<NodeId, Point> _nodePositions = new();
     private readonly Dictionary<NodeId, Border> _nodeCards = new();
+    private readonly Dictionary<PortKey, Border> _portHandles = new();
+    private readonly Dictionary<NodeId, string> _imageInputDisplayPathByNode = new();
+    private readonly List<Button> _nodeStripButtons = new();
     private readonly List<Control> _wireVisuals = new();
     private readonly Dictionary<int, NodeId> _previewSlots = new();
     private readonly Canvas _graphLayer = new();
     private readonly Border _graphLayerClipHost = new() { ClipToBounds = true };
-    private WorkspaceLayoutManager? _workspaceLayoutManager;
     private IReadOnlyList<Edge> _edgeSnapshot = Array.Empty<Edge>();
     private NodeId? _activeDragNodeId;
     private NodeId? _selectedNodeId;
+    private PortKey? _activeConnectionSource;
+    private PortKey? _hoverConnectionTarget;
+    private Point _activeConnectionPointerWorld;
     private int? _activePreviewSlot;
     private bool _isPanningCanvas;
+    private bool _isConnectionDragging;
     private bool _isViewTransformInitialized;
+    private bool _hasAutoFittedInitialView;
     private Point _lastPanPointerScreen;
     private Point _activeDragOffset;
     private Vector _panOffset;
     private double _zoomScale = 1.0;
     private WriteableBitmap? _previewBitmap;
+    private TopToolbarView ToolbarView => this.FindControl<TopToolbarView>("TopToolbar")
+                                          ?? throw new InvalidOperationException("TopToolbar not found.");
+    private GraphPanelView GraphPanelView => this.FindControl<GraphPanelView>("GraphPanelRoot")
+                                             ?? throw new InvalidOperationException("GraphPanelRoot not found.");
+    private ViewerPanelView ViewerPanelView => this.FindControl<ViewerPanelView>("ViewerPanelRoot")
+                                               ?? throw new InvalidOperationException("ViewerPanelRoot not found.");
+    private PropertiesPanelView PropertiesPanelView => this.FindControl<PropertiesPanelView>("PropertiesPanelRoot")
+                                                       ?? throw new InvalidOperationException("PropertiesPanelRoot not found.");
+    private Grid PaneSeed => this.FindControl<Grid>("PaneSeedGrid")
+                             ?? throw new InvalidOperationException("PaneSeedGrid not found.");
+    private Dock.Avalonia.Controls.DockControl WorkspaceDock => this.FindControl<Dock.Avalonia.Controls.DockControl>("WorkspaceDockControl")
+                                                               ?? throw new InvalidOperationException("WorkspaceDockControl not found.");
+    private Button ExportButton => ToolbarView.ExportButtonControl;
+    private Button UndoButton => ToolbarView.UndoButtonControl;
+    private Button RedoButton => ToolbarView.RedoButtonControl;
+    private TextBlock StatusTextBlock => ToolbarView.StatusTextBlockControl;
+    private StackPanel NodeStripHost => ToolbarView.NodeStripHostControl;
+    private Canvas NodeCanvas => GraphPanelView.NodeCanvasControl;
+    private Image PreviewImage => ViewerPanelView.PreviewImageControl;
+    private TextBlock SelectedNodeText => PropertiesPanelView.SelectedNodeTextControl;
+    private StackPanel PropertyEditorHost => PropertiesPanelView.PropertyEditorHostControl;
 
     public MainWindow()
         : this(new BootstrapEditorEngine(), new SkiaImageLoader(), new SkiaImageExporter())
@@ -75,6 +107,14 @@ public partial class MainWindow : Window
         _imageExporter = imageExporter;
 
         InitializeComponent();
+        _nodeCardBackground = ResolveBrush("Brush.NodeCard.Background", "#2B3038");
+        _nodeCardBorder = ResolveBrush("Brush.NodeCard.Border", "#4F5D73");
+        _nodeCardSelectedBorder = ResolveBrush("Brush.NodeCard.BorderSelected", "#59B5FF");
+        _nodeCardDragBorder = ResolveBrush("Brush.NodeCard.BorderDragging", "#E8B874");
+        _nodeCardTitleForeground = ResolveBrush("Brush.Text.Primary", "#E5EAF2");
+        _nodeCardDetailForeground = ResolveBrush("Brush.Text.Muted", "#95A1B3");
+        _wireStroke = ResolveBrush("Brush.Graph.Wire", "#72A6D5");
+        _wireArrowFill = ResolveBrush("Brush.Graph.Wire", "#72A6D5");
         WireEvents();
         InitializeUiState();
     }
@@ -82,6 +122,11 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _editorEngine.PreviewUpdated -= OnPreviewUpdated;
+        ExportButton.Click -= OnExportClicked;
+        UndoButton.Click -= OnUndoClicked;
+        RedoButton.Click -= OnRedoClicked;
+        UnwireNodeToolbarButtons();
+        NodeCanvas.PointerPressed -= OnNodeCanvasPointerPressed;
         NodeCanvas.SizeChanged -= OnNodeCanvasSizeChanged;
         NodeCanvas.PointerMoved -= OnNodeCanvasPointerMoved;
         NodeCanvas.PointerReleased -= OnNodeCanvasPointerReleased;
@@ -95,6 +140,10 @@ public partial class MainWindow : Window
     private void WireEvents()
     {
         _editorEngine.PreviewUpdated += OnPreviewUpdated;
+        ExportButton.Click += OnExportClicked;
+        UndoButton.Click += OnUndoClicked;
+        RedoButton.Click += OnRedoClicked;
+        NodeCanvas.PointerPressed += OnNodeCanvasPointerPressed;
         NodeCanvas.SizeChanged += OnNodeCanvasSizeChanged;
         NodeCanvas.PointerMoved += OnNodeCanvasPointerMoved;
         NodeCanvas.PointerReleased += OnNodeCanvasPointerReleased;
@@ -107,8 +156,7 @@ public partial class MainWindow : Window
     {
         InitializeWorkspaceUi();
         EnsureGraphLayer();
-        NodeTypeComboBox.ItemsSource = _editorEngine.AvailableNodeTypes;
-        NodeTypeComboBox.SelectedIndex = 0;
+        BuildNodeToolbarStrip();
         RefreshGraphBindings();
         SetStatus("Ready");
     }
@@ -117,135 +165,70 @@ public partial class MainWindow : Window
     {
         DetachSeedPanels();
 
-        _workspaceLayoutManager = new WorkspaceLayoutManager(
-            GraphPanelRoot,
-            ViewerPanelRoot,
-            PropertiesPanelRoot);
+        var workspaceLayoutManager = new WorkspaceLayoutManager(
+            GraphPanelView,
+            ViewerPanelView,
+            PropertiesPanelView);
 
-        WorkspaceDockControl.Factory = _workspaceLayoutManager.Factory;
-        WorkspaceDockControl.Layout = _workspaceLayoutManager.Layout;
-        WorkspaceDockControl.IsDockingEnabled = true;
-
-        SourcePanelComboBox.ItemsSource = _workspaceLayoutManager.PanelOptions;
-        TargetPanelComboBox.ItemsSource = _workspaceLayoutManager.PanelOptions;
-        SourcePanelComboBox.SelectedItem = _workspaceLayoutManager.PanelOptions[0];
-        TargetPanelComboBox.SelectedItem = _workspaceLayoutManager.PanelOptions[1];
+        WorkspaceDock.Factory = workspaceLayoutManager.Factory;
+        WorkspaceDock.Layout = workspaceLayoutManager.Layout;
+        WorkspaceDock.IsDockingEnabled = true;
     }
 
     private void DetachSeedPanels()
     {
-        PaneSeedGrid.Children.Remove(GraphPanelRoot);
-        PaneSeedGrid.Children.Remove(ViewerPanelRoot);
-        PaneSeedGrid.Children.Remove(PropertiesPanelRoot);
+        PaneSeed.Children.Remove(GraphPanelView);
+        PaneSeed.Children.Remove(ViewerPanelView);
+        PaneSeed.Children.Remove(PropertiesPanelView);
     }
 
-    private void OnDockTabClicked(object? sender, RoutedEventArgs e)
+    private void BuildNodeToolbarStrip()
     {
-        if (!TryGetWorkspaceCommandPanels(out var source, out var target))
+        UnwireNodeToolbarButtons();
+        NodeStripHost.Children.Clear();
+
+        foreach (var nodeType in _editorEngine.AvailableNodeTypes)
         {
-            return;
-        }
-
-        if (_workspaceLayoutManager is null || !_workspaceLayoutManager.TryDockAsTab(source, target))
-        {
-            SetStatus("Dock tab action failed.");
-            return;
-        }
-
-        SetStatus($"Docked {source} as a tab with {target}.");
-    }
-
-    private void OnDockLeftClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Left);
-
-    private void OnDockRightClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Right);
-
-    private void OnDockTopClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Top);
-
-    private void OnDockBottomClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Bottom);
-
-    private void DockWithOperation(DockOperation operation)
-    {
-        if (!TryGetWorkspaceCommandPanels(out var source, out var target))
-        {
-            return;
-        }
-
-        if (_workspaceLayoutManager is null || !_workspaceLayoutManager.TrySplit(source, target, operation))
-        {
-            SetStatus($"Dock {operation} action failed.");
-            return;
-        }
-
-        SetStatus($"Docked {source} {operation.ToString().ToLowerInvariant()} of {target}.");
-    }
-
-    private bool TryGetWorkspaceCommandPanels(out WorkspacePanelId source, out WorkspacePanelId target)
-    {
-        source = default;
-        target = default;
-
-        if (SourcePanelComboBox.SelectedItem is not WorkspacePanelOption sourceOption ||
-            TargetPanelComboBox.SelectedItem is not WorkspacePanelOption targetOption)
-        {
-            SetStatus("Select source and target panels first.");
-            return false;
-        }
-
-        source = sourceOption.Id;
-        target = targetOption.Id;
-        if (source == target)
-        {
-            SetStatus("Source and target panels must be different.");
-            return false;
-        }
-
-        return true;
-    }
-
-    private async void OnLoadClicked(object? sender, RoutedEventArgs e)
-    {
-        if (StorageProvider is null)
-        {
-            SetStatus("Storage provider unavailable.");
-            return;
-        }
-
-        var files = await StorageProvider.OpenFilePickerAsync(
-            new FilePickerOpenOptions
+            var button = new Button
             {
-                AllowMultiple = false,
-                Title = "Load Image",
-                FileTypeFilter = new[]
-                {
-                    new FilePickerFileType("Images")
-                    {
-                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg" }
-                    }
-                }
-            });
+                Tag = nodeType,
+                Content = GetNodeToolbarLabel(nodeType),
+                Classes = { "node-strip-button" },
+                Padding = new Thickness(8, 4),
+                MinWidth = 34
+            };
+            ToolTip.SetTip(button, $"Add {nodeType}");
+            button.Click += OnNodeToolbarAddClicked;
+            NodeStripHost.Children.Add(button);
+            _nodeStripButtons.Add(button);
+        }
+    }
 
-        var file = files.FirstOrDefault();
-        if (file is null)
+    private void UnwireNodeToolbarButtons()
+    {
+        foreach (var button in _nodeStripButtons)
         {
-            return;
+            button.Click -= OnNodeToolbarAddClicked;
         }
 
-        var path = file.TryGetLocalPath();
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            SetStatus("Selected file has no local path.");
-            return;
-        }
+        _nodeStripButtons.Clear();
+    }
 
-        if (!_imageLoader.TryLoad(path, out var image, out var error) || image is null)
+    private static string GetNodeToolbarLabel(string nodeType)
+    {
+        return nodeType switch
         {
-            SetStatus($"Load failed: {error}");
-            return;
-        }
-
-        _editorEngine.SetInputImage(image);
-        RequestPreviewForActiveSlot();
-        SetStatus($"Loaded: {Path.GetFileName(path)}");
+            "ImageInput" => "In",
+            "Transform" => "Tr",
+            "Crop" => "Cr",
+            "ExposureContrast" => "Ex",
+            "Curves" => "Cv",
+            "Hsl" => "Hs",
+            "Blur" => "Bl",
+            "Sharpen" => "Sh",
+            "Blend" => "Mx",
+            _ => nodeType.Length >= 2 ? nodeType[..2] : nodeType
+        };
     }
 
     private async void OnExportClicked(object? sender, RoutedEventArgs e)
@@ -296,30 +279,6 @@ public partial class MainWindow : Window
         SetStatus($"Exported: {Path.GetFileName(path)}");
     }
 
-    private void OnBuildChainClicked(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var transform = _editorEngine.AddNode(NodeTypes.Transform);
-            var exposure = _editorEngine.AddNode(NodeTypes.ExposureContrast);
-            var blur = _editorEngine.AddNode(NodeTypes.Blur);
-            var sharpen = _editorEngine.AddNode(NodeTypes.Sharpen);
-
-            _editorEngine.Connect(_editorEngine.InputNodeId, "Image", transform, "Image");
-            _editorEngine.Connect(transform, "Image", exposure, "Image");
-            _editorEngine.Connect(exposure, "Image", blur, "Image");
-            _editorEngine.Connect(blur, "Image", sharpen, "Image");
-            _editorEngine.Connect(sharpen, "Image", _editorEngine.OutputNodeId, "Image");
-
-            RefreshGraphBindings();
-            SetStatus("Built 4-node chain.");
-        }
-        catch (Exception exception)
-        {
-            SetStatus($"Build chain failed: {exception.Message}");
-        }
-    }
-
     private void OnUndoClicked(object? sender, RoutedEventArgs e)
     {
         _editorEngine.Undo();
@@ -334,14 +293,20 @@ public partial class MainWindow : Window
         SetStatus("Redo");
     }
 
-    private void OnAddNodeClicked(object? sender, RoutedEventArgs e)
+    private void OnNodeToolbarAddClicked(object? sender, RoutedEventArgs e)
     {
-        if (NodeTypeComboBox.SelectedItem is not string nodeType)
+        if (sender is not Button button ||
+            button.Tag is not string nodeType)
         {
-            SetStatus("Select a node type first.");
+            SetStatus("Node type action unavailable.");
             return;
         }
 
+        AddNodeOfType(nodeType);
+    }
+
+    private void AddNodeOfType(string nodeType)
+    {
         try
         {
             var nodeId = _editorEngine.AddNode(nodeType);
@@ -355,87 +320,69 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnConnectClicked(object? sender, RoutedEventArgs e)
+    private async Task<string?> PickImagePathAsync(string title)
     {
-        if (FromNodeComboBox.SelectedItem is not NodeOption fromNode ||
-            ToNodeComboBox.SelectedItem is not NodeOption toNode ||
-            FromPortComboBox.SelectedItem is not string fromPort ||
-            ToPortComboBox.SelectedItem is not string toPort)
+        if (StorageProvider is null)
         {
-            SetStatus("Select source node/port and target node/port.");
+            SetStatus("Storage provider unavailable.");
+            return null;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(
+            new FilePickerOpenOptions
+            {
+                AllowMultiple = false,
+                Title = title,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("Images")
+                    {
+                        Patterns = new[] { "*.png", "*.jpg", "*.jpeg" }
+                    }
+                }
+            });
+
+        var file = files.FirstOrDefault();
+        if (file is null)
+        {
+            return null;
+        }
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            SetStatus("Selected file has no local path.");
+            return null;
+        }
+
+        return path;
+    }
+
+    private async Task LoadImageIntoInputNodeAsync(NodeId nodeId)
+    {
+        var path = await PickImagePathAsync("Choose Source Image");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        if (!_imageLoader.TryLoad(path, out var image, out var error) || image is null)
+        {
+            SetStatus($"Load failed: {error}");
             return;
         }
 
         try
         {
-            _editorEngine.Connect(fromNode.Id, fromPort, toNode.Id, toPort);
-            RefreshGraphBindings();
-            SetStatus($"Connected {fromNode.Type}.{fromPort} -> {toNode.Type}.{toPort}");
+            _editorEngine.SetInputImage(nodeId, image);
+            _imageInputDisplayPathByNode[nodeId] = path;
+            RequestPreviewForActiveSlot();
+            SetStatus($"Loaded {Path.GetFileName(path)} into {nodeId}.");
+            RefreshPropertiesEditor();
         }
         catch (Exception exception)
         {
-            SetStatus($"Connect failed: {exception.Message}");
-        }
-    }
-
-    private void OnFromNodeSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        RefreshFromPorts();
-    }
-
-    private void OnToNodeSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        RefreshToPorts();
-    }
-
-    private void OnParameterNodeSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        RefreshParameterNames();
-    }
-
-    private void OnParameterNameSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        RefreshParameterValueInput();
-    }
-
-    private void OnApplyParameterClicked(object? sender, RoutedEventArgs e)
-    {
-        if (ParameterNodeComboBox.SelectedItem is not NodeOption nodeOption)
-        {
-            SetStatus("Select a node to edit.");
-            return;
-        }
-
-        if (ParameterNameComboBox.SelectedItem is not string parameterName)
-        {
-            SetStatus("Select a parameter.");
-            return;
-        }
-
-        if (!_nodeLookup.TryGetValue(nodeOption.Id, out var node))
-        {
-            SetStatus("Selected node no longer exists.");
-            return;
-        }
-
-        var nodeType = NodeTypeCatalog.GetByName(node.Type);
-        if (!nodeType.Parameters.TryGetValue(parameterName, out var definition))
-        {
-            SetStatus($"Parameter '{parameterName}' not found.");
-            return;
-        }
-
-        try
-        {
-            var rawText = ParameterValueTextBox.Text ?? string.Empty;
-            var value = ParseParameterValue(definition, rawText);
-            _editorEngine.SetParameter(node.Id, parameterName, value);
-            RefreshGraphBindings();
-            SetStatus($"Updated {node.Type}.{parameterName}");
-        }
-        catch (Exception exception)
-        {
-            SetStatus($"Set parameter failed: {exception.Message}");
+            SetStatus($"Load failed: {exception.Message}");
         }
     }
 
@@ -480,22 +427,9 @@ public partial class MainWindow : Window
             _nodeLookup[node.Id] = node;
         }
 
-        var nodeOptions = nodes
-            .Select(node => new NodeOption(node.Id, node.Type))
-            .ToArray();
-
         RefreshNodeCanvas(nodes, edges);
-        NodeListBox.ItemsSource = nodeOptions.Select(option => option.ToString()).ToArray();
-        EdgeListBox.ItemsSource = edges.Select(DescribeEdge).ToArray();
-
-        SyncComboSelection(FromNodeComboBox, nodeOptions);
-        SyncComboSelection(ToNodeComboBox, nodeOptions);
-        SyncComboSelection(ParameterNodeComboBox, nodeOptions);
-
-        RefreshFromPorts();
-        RefreshToPorts();
-        RefreshParameterNames();
         PruneSelectionAndPreviewSlots(nodes);
+        RefreshPropertiesEditor();
 
         UndoButton.IsEnabled = _editorEngine.CanUndo;
         RedoButton.IsEnabled = _editorEngine.CanRedo;
@@ -531,6 +465,7 @@ public partial class MainWindow : Window
         _graphLayer.Children.Clear();
         _wireVisuals.Clear();
         _nodeCards.Clear();
+        _portHandles.Clear();
         foreach (var node in nodes)
         {
             var card = CreateNodeCard(node);
@@ -539,30 +474,67 @@ public partial class MainWindow : Window
             _nodeCards[node.Id] = card;
         }
 
+        if (_activeConnectionSource is PortKey sourceKey && !liveNodeIds.Contains(sourceKey.NodeId))
+        {
+            ResetConnectionDragState();
+        }
+
         RenderWireVisuals(edges);
         ApplyNodeSelectionVisuals();
     }
 
     private Border CreateNodeCard(Node node)
     {
+        var nodeType = NodeTypeCatalog.GetByName(node.Type);
         var title = new TextBlock
         {
             Text = node.Type,
             FontWeight = FontWeight.SemiBold,
-            Foreground = NodeCardTitleForeground
+            Foreground = _nodeCardTitleForeground
         };
         var detail = new TextBlock
         {
             Text = node.Id.ToString()[..8],
-            Foreground = NodeCardDetailForeground
+            Foreground = _nodeCardDetailForeground
         };
 
-        var content = new StackPanel
+        var details = new StackPanel
         {
             Spacing = 3
         };
-        content.Children.Add(title);
-        content.Children.Add(detail);
+        details.Children.Add(title);
+        details.Children.Add(detail);
+
+        var inputPorts = new StackPanel
+        {
+            Spacing = 4,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        };
+        foreach (var input in nodeType.Inputs)
+        {
+            inputPorts.Children.Add(CreatePortHandle(node.Id, input.Name, PortDirection.Input));
+        }
+
+        var outputPorts = new StackPanel
+        {
+            Spacing = 4,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+        };
+        foreach (var output in nodeType.Outputs)
+        {
+            outputPorts.Children.Add(CreatePortHandle(node.Id, output.Name, PortDirection.Output));
+        }
+
+        var content = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+            ColumnSpacing = 8
+        };
+        content.Children.Add(inputPorts);
+        content.Children.Add(details);
+        Grid.SetColumn(details, 1);
+        content.Children.Add(outputPorts);
+        Grid.SetColumn(outputPorts, 2);
 
         var card = new Border
         {
@@ -570,19 +542,87 @@ public partial class MainWindow : Window
             Width = NodeCardWidth,
             MinHeight = NodeCardHeight,
             Padding = new Thickness(8),
-            Background = NodeCardBackground,
-            BorderBrush = NodeCardBorder,
+            Background = _nodeCardBackground,
+            BorderBrush = _nodeCardBorder,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
             Cursor = new Cursor(StandardCursorType.SizeAll),
             Child = content
         };
+        card.Classes.Add("node-card");
 
         card.PointerPressed += OnNodeCardPointerPressed;
         card.PointerMoved += OnNodeCardPointerMoved;
         card.PointerReleased += OnNodeCardPointerReleased;
         card.PointerCaptureLost += OnNodeCardPointerCaptureLost;
         return card;
+    }
+
+    private Border CreatePortHandle(NodeId nodeId, string portName, PortDirection direction)
+    {
+        var key = new PortKey(nodeId, portName, direction);
+        var handle = new Border
+        {
+            Tag = key,
+            Width = PortHandleSize,
+            Height = PortHandleSize,
+            CornerRadius = new CornerRadius(PortHandleSize / 2),
+            BorderThickness = new Thickness(1),
+            BorderBrush = _nodeCardBorder,
+            Background = direction == PortDirection.Input
+                ? ResolveBrush("Brush.PortHandle.Input", "#54657B")
+                : ResolveBrush("Brush.PortHandle.Output", "#6F9AC4"),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        ToolTip.SetTip(handle, $"{direction}: {portName}");
+
+        if (direction == PortDirection.Output)
+        {
+            handle.PointerPressed += OnOutputPortHandlePressed;
+        }
+        else
+        {
+            handle.PointerPressed += OnInputPortHandlePressed;
+        }
+
+        _portHandles[key] = handle;
+        return handle;
+    }
+
+    private void OnOutputPortHandlePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border handle ||
+            handle.Tag is not PortKey key ||
+            !e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _activeConnectionSource = key;
+        _hoverConnectionTarget = null;
+        _isConnectionDragging = true;
+
+        if (!TryGetPortAnchor(key, out _activeConnectionPointerWorld))
+        {
+            _activeConnectionPointerWorld = ScreenToWorld(e.GetPosition(NodeCanvas));
+        }
+
+        NodeCanvas.Focus();
+        e.Pointer.Capture(NodeCanvas);
+        RenderWireVisuals(_edgeSnapshot);
+        e.Handled = true;
+    }
+
+    private static void OnInputPortHandlePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border handle ||
+            !e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        // Consume left-click on input handles so node card drag does not start from the handle.
+        e.Handled = true;
     }
 
     private void OnNodeCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -604,6 +644,7 @@ public partial class MainWindow : Window
         {
             _selectedNodeId = null;
             ApplyNodeSelectionVisuals();
+            RefreshPropertiesEditor();
             NodeCanvas.Focus();
             e.Handled = true;
         }
@@ -611,6 +652,11 @@ public partial class MainWindow : Window
 
     private void OnNodeCardPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (_isConnectionDragging)
+        {
+            return;
+        }
+
         if (sender is not Border card ||
             card.Tag is not NodeId nodeId ||
             !e.GetCurrentPoint(card).Properties.IsLeftButtonPressed)
@@ -628,7 +674,7 @@ public partial class MainWindow : Window
             pointerPosition.X - currentPosition.X,
             pointerPosition.Y - currentPosition.Y);
 
-        card.BorderBrush = NodeCardDragBorder;
+        card.BorderBrush = _nodeCardDragBorder;
         e.Pointer.Capture(card);
         e.Handled = true;
     }
@@ -681,7 +727,7 @@ public partial class MainWindow : Window
 
     private void CompleteNodeCardDrag(Border card, NodeId nodeId)
     {
-        card.BorderBrush = _selectedNodeId == nodeId ? NodeCardSelectedBorder : NodeCardBorder;
+        card.BorderBrush = _selectedNodeId == nodeId ? _nodeCardSelectedBorder : _nodeCardBorder;
         _activeDragNodeId = null;
 
         if (_nodeLookup.TryGetValue(nodeId, out var node))
@@ -697,8 +743,15 @@ public partial class MainWindow : Window
     {
         if (!_isViewTransformInitialized && e.NewSize.Width > 0 && e.NewSize.Height > 0)
         {
-            _panOffset = new Vector(e.NewSize.Width / 2, e.NewSize.Height / 2);
             _isViewTransformInitialized = true;
+        }
+
+        if (_isViewTransformInitialized &&
+            !_hasAutoFittedInitialView &&
+            _nodePositions.Count > 0)
+        {
+            AutoFitInitialNodeView();
+            _hasAutoFittedInitialView = true;
         }
 
         ApplyGraphTransform();
@@ -723,6 +776,18 @@ public partial class MainWindow : Window
 
     private void OnNodeCanvasPointerMoved(object? sender, PointerEventArgs e)
     {
+        if (_isConnectionDragging && e.Pointer.Captured == NodeCanvas)
+        {
+            var pointerScreen = e.GetPosition(NodeCanvas);
+            _activeConnectionPointerWorld = ScreenToWorld(pointerScreen);
+            _hoverConnectionTarget = TryFindNearestInputPort(pointerScreen, out var target, out _)
+                ? target
+                : null;
+            RenderWireVisuals(_edgeSnapshot);
+            e.Handled = true;
+            return;
+        }
+
         if (!_isPanningCanvas || e.Pointer.Captured != NodeCanvas)
         {
             return;
@@ -740,6 +805,16 @@ public partial class MainWindow : Window
 
     private void OnNodeCanvasPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_isConnectionDragging)
+        {
+            var pointerScreen = e.GetPosition(NodeCanvas);
+            TryCommitDraggedConnection(pointerScreen);
+            e.Pointer.Capture(null);
+            ResetConnectionDragState();
+            e.Handled = true;
+            return;
+        }
+
         if (!_isPanningCanvas)
         {
             return;
@@ -752,6 +827,12 @@ public partial class MainWindow : Window
 
     private void OnNodeCanvasPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
+        if (_isConnectionDragging)
+        {
+            ResetConnectionDragState();
+            return;
+        }
+
         if (!_isPanningCanvas)
         {
             return;
@@ -856,6 +937,14 @@ public partial class MainWindow : Window
             _selectedNodeId = null;
         }
 
+        var staleImagePaths = _imageInputDisplayPathByNode.Keys
+            .Where(nodeId => !liveNodeIds.Contains(nodeId))
+            .ToArray();
+        foreach (var staleImagePathNodeId in staleImagePaths)
+        {
+            _imageInputDisplayPathByNode.Remove(staleImagePathNodeId);
+        }
+
         var removedSlots = _previewSlots
             .Where(slot => !liveNodeIds.Contains(slot.Value))
             .Select(slot => slot.Key)
@@ -884,6 +973,7 @@ public partial class MainWindow : Window
 
         _selectedNodeId = nodeId;
         ApplyNodeSelectionVisuals();
+        RefreshPropertiesEditor();
     }
 
     private void ApplyNodeSelectionVisuals()
@@ -892,13 +982,13 @@ public partial class MainWindow : Window
         {
             if (_activeDragNodeId == nodeId)
             {
-                card.BorderBrush = NodeCardDragBorder;
+                card.BorderBrush = _nodeCardDragBorder;
                 continue;
             }
 
             card.BorderBrush = _selectedNodeId == nodeId
-                ? NodeCardSelectedBorder
-                : NodeCardBorder;
+                ? _nodeCardSelectedBorder
+                : _nodeCardBorder;
         }
     }
 
@@ -914,74 +1004,162 @@ public partial class MainWindow : Window
         var insertIndex = 0;
         foreach (var edge in edges)
         {
-            if (!_nodePositions.TryGetValue(edge.FromNodeId, out var fromPosition) ||
-                !_nodePositions.TryGetValue(edge.ToNodeId, out var toPosition))
+            var sourceKey = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
+            var targetKey = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
+            if (!TryGetPortAnchor(sourceKey, out var sourceAnchor) ||
+                !TryGetPortAnchor(targetKey, out var targetAnchor))
             {
                 continue;
             }
 
-            var fromCardWidth = GetCardWidth(edge.FromNodeId);
-            var fromCardHeight = GetCardHeight(edge.FromNodeId);
-            var toCardWidth = GetCardWidth(edge.ToNodeId);
-            var toCardHeight = GetCardHeight(edge.ToNodeId);
-            var fromCenter = new Point(
-                fromPosition.X + (fromCardWidth / 2),
-                fromPosition.Y + (fromCardHeight / 2));
-            var toCenter = new Point(
-                toPosition.X + (toCardWidth / 2),
-                toPosition.Y + (toCardHeight / 2));
-            var delta = new Vector(toCenter.X - fromCenter.X, toCenter.Y - fromCenter.Y);
-            var isHorizontalDominant = Math.Abs(delta.X) >= Math.Abs(delta.Y);
-            var sourceAnchor = ResolveSourceAnchor(fromPosition, fromCardWidth, fromCardHeight, delta, isHorizontalDominant);
-            var targetAnchor = ResolveTargetAnchor(toPosition, toCardWidth, toCardHeight, delta, isHorizontalDominant);
-            var (bendA, bendB) = ResolveOrthogonalBends(sourceAnchor, targetAnchor, isHorizontalDominant);
-
-            var wire = new Polyline
-            {
-                IsHitTestVisible = false,
-                Stroke = WireStroke,
-                StrokeThickness = WireThickness,
-                Points = new[] { sourceAnchor, bendA, bendB, targetAnchor }
-            };
-
-            var arrow = CreateArrowHead(bendB, targetAnchor);
+            var (wire, arrow) = CreateWire(sourceAnchor, targetAnchor);
             _graphLayer.Children.Insert(insertIndex++, wire);
             _graphLayer.Children.Insert(insertIndex++, arrow);
             _wireVisuals.Add(wire);
             _wireVisuals.Add(arrow);
         }
+
+        if (_isConnectionDragging &&
+            _activeConnectionSource is PortKey source &&
+            TryGetPortAnchor(source, out var dragSourceAnchor))
+        {
+            var dragTargetAnchor = _hoverConnectionTarget is PortKey hoverKey &&
+                                   TryGetPortAnchor(hoverKey, out var hoverAnchor)
+                ? hoverAnchor
+                : _activeConnectionPointerWorld;
+
+            var (dragWire, dragArrow) = CreateWire(dragSourceAnchor, dragTargetAnchor);
+            dragWire.StrokeDashArray = new AvaloniaList<double> { 5, 4 };
+            _graphLayer.Children.Insert(insertIndex++, dragWire);
+            _graphLayer.Children.Insert(insertIndex++, dragArrow);
+            _wireVisuals.Add(dragWire);
+            _wireVisuals.Add(dragArrow);
+        }
     }
 
-    private static Point ResolveSourceAnchor(
-        Point fromPosition,
-        double fromWidth,
-        double fromHeight,
-        Vector delta,
-        bool isHorizontalDominant)
+    private (Polyline Wire, Polygon Arrow) CreateWire(Point sourceAnchor, Point targetAnchor)
     {
-        return isHorizontalDominant
-            ? new Point(
-                delta.X >= 0 ? fromPosition.X + fromWidth : fromPosition.X,
-                fromPosition.Y + (fromHeight / 2))
-            : new Point(
-                fromPosition.X + (fromWidth / 2),
-                delta.Y >= 0 ? fromPosition.Y + fromHeight : fromPosition.Y);
+        var delta = new Vector(targetAnchor.X - sourceAnchor.X, targetAnchor.Y - sourceAnchor.Y);
+        var isHorizontalDominant = Math.Abs(delta.X) >= Math.Abs(delta.Y);
+        var (bendA, bendB) = ResolveOrthogonalBends(sourceAnchor, targetAnchor, isHorizontalDominant);
+
+        var wire = new Polyline
+        {
+            IsHitTestVisible = false,
+            Stroke = _wireStroke,
+            StrokeThickness = WireThickness,
+            Points = new[] { sourceAnchor, bendA, bendB, targetAnchor }
+        };
+        var arrow = (Polygon)CreateArrowHead(bendB, targetAnchor);
+        return (wire, arrow);
     }
 
-    private static Point ResolveTargetAnchor(
-        Point toPosition,
-        double toWidth,
-        double toHeight,
-        Vector delta,
-        bool isHorizontalDominant)
+    private bool TryCommitDraggedConnection(Point pointerScreen)
     {
-        return isHorizontalDominant
-            ? new Point(
-                delta.X >= 0 ? toPosition.X : toPosition.X + toWidth,
-                toPosition.Y + (toHeight / 2))
-            : new Point(
-                toPosition.X + (toWidth / 2),
-                delta.Y >= 0 ? toPosition.Y : toPosition.Y + toHeight);
+        if (_activeConnectionSource is not PortKey source)
+        {
+            return false;
+        }
+
+        if (!TryFindNearestInputPort(pointerScreen, out var target, out _))
+        {
+            SetStatus("Connection canceled.");
+            return false;
+        }
+
+        try
+        {
+            _editorEngine.Connect(source.NodeId, source.PortName, target.NodeId, target.PortName);
+            RefreshGraphBindings();
+            SetStatus($"Connected {source.PortName} -> {target.PortName}");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"Connect failed: {exception.Message}");
+            return false;
+        }
+    }
+
+    private void ResetConnectionDragState()
+    {
+        _isConnectionDragging = false;
+        _activeConnectionSource = null;
+        _hoverConnectionTarget = null;
+        RenderWireVisuals(_edgeSnapshot);
+    }
+
+    private bool TryFindNearestInputPort(Point pointerScreen, out PortKey targetPort, out Point targetAnchor)
+    {
+        targetPort = default;
+        targetAnchor = default;
+        var found = false;
+        var nearestDistance = double.MaxValue;
+        foreach (var node in _nodeLookup.Values)
+        {
+            var nodeType = NodeTypeCatalog.GetByName(node.Type);
+            foreach (var input in nodeType.Inputs)
+            {
+                var candidate = new PortKey(node.Id, input.Name, PortDirection.Input);
+                if (!TryGetPortAnchor(candidate, out var anchor))
+                {
+                    continue;
+                }
+
+                var anchorScreen = WorldToScreen(anchor);
+                var dx = anchorScreen.X - pointerScreen.X;
+                var dy = anchorScreen.Y - pointerScreen.Y;
+                var distance = Math.Sqrt((dx * dx) + (dy * dy));
+                if (distance > PortSnapDistancePixels || distance >= nearestDistance)
+                {
+                    continue;
+                }
+
+                nearestDistance = distance;
+                targetPort = candidate;
+                targetAnchor = anchor;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    private bool TryGetPortAnchor(PortKey key, out Point anchor)
+    {
+        anchor = default;
+
+        if (!_nodeLookup.TryGetValue(key.NodeId, out var node) ||
+            !_nodePositions.TryGetValue(key.NodeId, out var nodePosition))
+        {
+            return false;
+        }
+
+        var nodeType = NodeTypeCatalog.GetByName(node.Type);
+        var ports = key.Direction == PortDirection.Input
+            ? nodeType.Inputs
+            : nodeType.Outputs;
+        var portIndex = ports
+            .Select((port, index) => new { port.Name, Index = index })
+            .Where(item => string.Equals(item.Name, key.PortName, StringComparison.Ordinal))
+            .Select(item => item.Index)
+            .FirstOrDefault(-1);
+        if (portIndex < 0)
+        {
+            return false;
+        }
+
+        var cardHeight = GetCardHeight(key.NodeId);
+        var cardWidth = GetCardWidth(key.NodeId);
+        var totalSpan = (ports.Count - 1) * PortHandleVerticalSpacing;
+        var startY = nodePosition.Y + ((cardHeight - totalSpan) / 2);
+        var y = startY + (portIndex * PortHandleVerticalSpacing);
+        var x = key.Direction == PortDirection.Input
+            ? nodePosition.X
+            : nodePosition.X + cardWidth;
+
+        anchor = new Point(x, y);
+        return true;
     }
 
     private static (Point BendA, Point BendB) ResolveOrthogonalBends(
@@ -1039,7 +1217,7 @@ public partial class MainWindow : Window
             return new Polygon
             {
                 IsHitTestVisible = false,
-                Fill = WireArrowFill,
+                Fill = _wireArrowFill,
                 Points = new[] { to, to, to }
             };
         }
@@ -1059,7 +1237,7 @@ public partial class MainWindow : Window
         return new Polygon
         {
             IsHitTestVisible = false,
-            Fill = WireArrowFill,
+            Fill = _wireArrowFill,
             Points = new[] { to, left, right }
         };
     }
@@ -1141,6 +1319,13 @@ public partial class MainWindow : Window
             (screenPoint.Y - _panOffset.Y) / _zoomScale);
     }
 
+    private Point WorldToScreen(Point worldPoint)
+    {
+        return new Point(
+            (worldPoint.X * _zoomScale) + _panOffset.X,
+            (worldPoint.Y * _zoomScale) + _panOffset.Y);
+    }
+
     private Point GetViewportCenterWorld()
     {
         if (NodeCanvas.Bounds.Width <= 0 || NodeCanvas.Bounds.Height <= 0)
@@ -1150,6 +1335,56 @@ public partial class MainWindow : Window
 
         var screenCenter = new Point(NodeCanvas.Bounds.Width / 2, NodeCanvas.Bounds.Height / 2);
         return ScreenToWorld(screenCenter);
+    }
+
+    private void AutoFitInitialNodeView()
+    {
+        if (_nodePositions.Count == 0 || NodeCanvas.Bounds.Width <= 0 || NodeCanvas.Bounds.Height <= 0)
+        {
+            return;
+        }
+
+        var worldBounds = CalculateNodeWorldBounds();
+        var viewportCenter = new Point(NodeCanvas.Bounds.Width / 2, NodeCanvas.Bounds.Height / 2);
+        var worldCenter = new Point(
+            worldBounds.X + (worldBounds.Width / 2),
+            worldBounds.Y + (worldBounds.Height / 2));
+
+        _panOffset = new Vector(
+            viewportCenter.X - (worldCenter.X * _zoomScale),
+            viewportCenter.Y - (worldCenter.Y * _zoomScale));
+
+        var worldTopLeft = new Point(worldBounds.X, worldBounds.Y);
+        var screenTopLeft = WorldToScreen(worldTopLeft);
+        var nudge = new Vector(
+            Math.Max(0, 16 - screenTopLeft.X),
+            Math.Max(0, 16 - screenTopLeft.Y));
+        _panOffset += nudge;
+    }
+
+    private Rect CalculateNodeWorldBounds()
+    {
+        var minX = double.MaxValue;
+        var minY = double.MaxValue;
+        var maxX = double.MinValue;
+        var maxY = double.MinValue;
+
+        foreach (var (nodeId, position) in _nodePositions)
+        {
+            var cardWidth = GetCardWidth(nodeId);
+            var cardHeight = GetCardHeight(nodeId);
+            minX = Math.Min(minX, position.X);
+            minY = Math.Min(minY, position.Y);
+            maxX = Math.Max(maxX, position.X + cardWidth);
+            maxY = Math.Max(maxY, position.Y + cardHeight);
+        }
+
+        if (minX == double.MaxValue || minY == double.MaxValue)
+        {
+            return new Rect(0, 0, NodeCardWidth, NodeCardHeight);
+        }
+
+        return new Rect(minX, minY, Math.Max(1, maxX - minX), Math.Max(1, maxY - minY));
     }
 
     private static Point GetDefaultNodePosition(int index)
@@ -1176,97 +1411,289 @@ public partial class MainWindow : Window
         Canvas.SetTop(card, position.Y);
     }
 
-    private static void SyncComboSelection(ComboBox comboBox, IReadOnlyList<NodeOption> options)
+    private void RefreshPropertiesEditor()
     {
-        var current = comboBox.SelectedItem as NodeOption;
-        comboBox.ItemsSource = options;
-        if (current is null)
+        PropertyEditorHost.Children.Clear();
+
+        if (_selectedNodeId is not NodeId nodeId ||
+            !_nodeLookup.TryGetValue(nodeId, out var node))
         {
-            comboBox.SelectedIndex = options.Count > 0 ? 0 : -1;
+            SelectedNodeText.Text = "None";
+            PropertyEditorHost.Children.Add(
+                new TextBlock
+                {
+                    Classes = { "hint-text" },
+                    Text = "Select a node on the graph to edit its properties.",
+                    TextWrapping = TextWrapping.Wrap
+                });
             return;
         }
 
-        var match = options.FirstOrDefault(option => option.Id == current.Id);
-        comboBox.SelectedItem = match ?? options.FirstOrDefault();
-    }
+        SelectedNodeText.Text = $"{node.Type} ({node.Id.ToString()[..8]})";
 
-    private void RefreshFromPorts()
-    {
-        if (FromNodeComboBox.SelectedItem is not NodeOption selected ||
-            !_nodeLookup.TryGetValue(selected.Id, out var node))
+        if (string.Equals(node.Type, NodeTypes.ImageInput, StringComparison.Ordinal))
         {
-            FromPortComboBox.ItemsSource = Array.Empty<string>();
-            return;
+            PropertyEditorHost.Children.Add(CreateImageInputEditor(node.Id));
         }
 
-        var ports = NodeTypeCatalog.GetByName(node.Type)
-            .Outputs
-            .Select(port => port.Name)
-            .ToArray();
-        FromPortComboBox.ItemsSource = ports;
-        FromPortComboBox.SelectedIndex = ports.Length > 0 ? 0 : -1;
-    }
-
-    private void RefreshToPorts()
-    {
-        if (ToNodeComboBox.SelectedItem is not NodeOption selected ||
-            !_nodeLookup.TryGetValue(selected.Id, out var node))
-        {
-            ToPortComboBox.ItemsSource = Array.Empty<string>();
-            return;
-        }
-
-        var ports = NodeTypeCatalog.GetByName(node.Type)
-            .Inputs
-            .Select(port => port.Name)
-            .ToArray();
-        ToPortComboBox.ItemsSource = ports;
-        ToPortComboBox.SelectedIndex = ports.Length > 0 ? 0 : -1;
-    }
-
-    private void RefreshParameterNames()
-    {
-        if (ParameterNodeComboBox.SelectedItem is not NodeOption selected ||
-            !_nodeLookup.TryGetValue(selected.Id, out var node))
-        {
-            ParameterNameComboBox.ItemsSource = Array.Empty<string>();
-            ParameterValueTextBox.Text = string.Empty;
-            return;
-        }
-
-        var parameterNames = NodeTypeCatalog.GetByName(node.Type)
+        var definitions = NodeTypeCatalog.GetByName(node.Type)
             .Parameters
-            .Keys
-            .OrderBy(name => name, StringComparer.Ordinal)
+            .Values
+            .OrderBy(definition => definition.Name, StringComparer.Ordinal)
             .ToArray();
 
-        ParameterNameComboBox.ItemsSource = parameterNames;
-        ParameterNameComboBox.SelectedIndex = parameterNames.Length > 0 ? 0 : -1;
-        RefreshParameterValueInput();
-    }
-
-    private void RefreshParameterValueInput()
-    {
-        if (ParameterNodeComboBox.SelectedItem is not NodeOption selected ||
-            !_nodeLookup.TryGetValue(selected.Id, out var node) ||
-            ParameterNameComboBox.SelectedItem is not string parameterName)
+        foreach (var definition in definitions)
         {
-            ParameterValueTextBox.Text = string.Empty;
-            return;
+            PropertyEditorHost.Children.Add(
+                CreateParameterEditor(
+                    node.Id,
+                    node.Type,
+                    definition,
+                    node.GetParameter(definition.Name)));
         }
 
-        ParameterValueTextBox.Text = FormatParameterValue(node.GetParameter(parameterName));
+        if (definitions.Length == 0 && !string.Equals(node.Type, NodeTypes.ImageInput, StringComparison.Ordinal))
+        {
+            PropertyEditorHost.Children.Add(
+                new TextBlock
+                {
+                    Classes = { "hint-text" },
+                    Text = "This node has no editable parameters.",
+                    TextWrapping = TextWrapping.Wrap
+                });
+        }
     }
 
-    private static ParameterValue ParseParameterValue(NodeParameterDefinition definition, string rawText)
+    private Border CreateImageInputEditor(NodeId nodeId)
+    {
+        var pathText = new TextBlock
+        {
+            Classes = { "hint-text" },
+            TextWrapping = TextWrapping.Wrap,
+            Text = _imageInputDisplayPathByNode.TryGetValue(nodeId, out var sourcePath)
+                ? sourcePath
+                : "No image selected."
+        };
+
+        var pickButton = new Button
+        {
+            Classes = { "action-button", "action-button-primary" },
+            Content = "Choose Image..."
+        };
+        pickButton.Click += async (_, _) => await LoadImageIntoInputNodeAsync(nodeId);
+
+        return new Border
+        {
+            Classes = { "hint-shell" },
+            Child = new StackPanel
+            {
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Classes = { "section-label" },
+                        Text = "Source Image"
+                    },
+                    pathText,
+                    pickButton
+                }
+            }
+        };
+    }
+
+    private Control CreateParameterEditor(
+        NodeId nodeId,
+        string nodeType,
+        NodeParameterDefinition definition,
+        ParameterValue currentValue)
+    {
+        return definition.Kind switch
+        {
+            ParameterValueKind.Boolean => CreateBooleanParameterEditor(nodeId, nodeType, definition, currentValue),
+            ParameterValueKind.Enum => CreateEnumParameterEditor(nodeId, nodeType, definition, currentValue),
+            ParameterValueKind.Float or ParameterValueKind.Integer =>
+                CreateTextParameterEditor(nodeId, nodeType, definition, currentValue),
+            _ => new TextBlock
+            {
+                Classes = { "hint-text" },
+                Text = $"Unsupported parameter kind '{definition.Kind}'."
+            }
+        };
+    }
+
+    private Control CreateTextParameterEditor(
+        NodeId nodeId,
+        string nodeType,
+        NodeParameterDefinition definition,
+        ParameterValue currentValue)
+    {
+        var textBox = new TextBox
+        {
+            Text = FormatParameterValue(currentValue),
+            Watermark = GetParameterHint(definition)
+        };
+
+        var applyButton = new Button
+        {
+            Content = "Apply"
+        };
+        applyButton.Click += (_, _) =>
+        {
+            try
+            {
+                var parsedValue = ParseTextParameterValue(definition, textBox.Text ?? string.Empty);
+                ApplyParameterUpdate(nodeId, nodeType, definition, parsedValue);
+            }
+            catch (Exception exception)
+            {
+                SetStatus($"Set parameter failed: {exception.Message}");
+            }
+        };
+
+        textBox.KeyDown += (_, keyEventArgs) =>
+        {
+            if (keyEventArgs.Key != Key.Enter)
+            {
+                return;
+            }
+
+            applyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            keyEventArgs.Handled = true;
+        };
+
+        var row = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnSpacing = 8
+        };
+        row.Children.Add(textBox);
+        row.Children.Add(applyButton);
+        Grid.SetColumn(applyButton, 1);
+
+        return new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock
+                {
+                    Classes = { "section-label" },
+                    Text = GetParameterLabel(nodeType, definition)
+                },
+                row
+            }
+        };
+    }
+
+    private Control CreateBooleanParameterEditor(
+        NodeId nodeId,
+        string nodeType,
+        NodeParameterDefinition definition,
+        ParameterValue currentValue)
+    {
+        var checkBox = new CheckBox
+        {
+            Content = GetParameterLabel(nodeType, definition),
+            IsChecked = currentValue.AsBoolean()
+        };
+
+        checkBox.IsCheckedChanged += (_, _) =>
+            ApplyParameterUpdate(nodeId, nodeType, definition, ParameterValue.Boolean(checkBox.IsChecked ?? false));
+
+        return checkBox;
+    }
+
+    private Control CreateEnumParameterEditor(
+        NodeId nodeId,
+        string nodeType,
+        NodeParameterDefinition definition,
+        ParameterValue currentValue)
+    {
+        var comboBox = new ComboBox
+        {
+            ItemsSource = definition.EnumValues ?? Array.Empty<string>(),
+            SelectedItem = currentValue.AsEnum()
+        };
+
+        comboBox.SelectionChanged += (_, _) =>
+        {
+            if (comboBox.SelectedItem is not string selected)
+            {
+                return;
+            }
+
+            ApplyParameterUpdate(nodeId, nodeType, definition, ParameterValue.Enum(selected));
+        };
+
+        return new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock
+                {
+                    Classes = { "section-label" },
+                    Text = GetParameterLabel(nodeType, definition)
+                },
+                comboBox
+            }
+        };
+    }
+
+    private void ApplyParameterUpdate(
+        NodeId nodeId,
+        string nodeType,
+        NodeParameterDefinition definition,
+        ParameterValue value)
+    {
+        try
+        {
+            _editorEngine.SetParameter(nodeId, definition.Name, value);
+            RefreshGraphBindings();
+            SetStatus($"Updated {nodeType}.{definition.Name}");
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"Set parameter failed: {exception.Message}");
+        }
+    }
+
+    private static ParameterValue ParseTextParameterValue(NodeParameterDefinition definition, string rawText)
     {
         return definition.Kind switch
         {
             ParameterValueKind.Float => ParameterValue.Float(float.Parse(rawText, CultureInfo.InvariantCulture)),
             ParameterValueKind.Integer => ParameterValue.Integer(int.Parse(rawText, CultureInfo.InvariantCulture)),
-            ParameterValueKind.Boolean => ParameterValue.Boolean(bool.Parse(rawText)),
-            ParameterValueKind.Enum => ParameterValue.Enum(rawText.Trim()),
-            _ => throw new InvalidOperationException($"Unsupported parameter kind '{definition.Kind}'.")
+            _ => throw new InvalidOperationException($"Unsupported text parameter kind '{definition.Kind}'.")
+        };
+    }
+
+    private static string GetParameterLabel(string nodeType, NodeParameterDefinition definition)
+    {
+        var displayName =
+            string.Equals(nodeType, NodeTypes.Blur, StringComparison.Ordinal) &&
+            string.Equals(definition.Name, "Radius", StringComparison.Ordinal)
+                ? "Blur Amount"
+                : definition.Name;
+
+        return definition.Kind switch
+        {
+            ParameterValueKind.Float when definition.MinFloat.HasValue || definition.MaxFloat.HasValue =>
+                $"{displayName} ({definition.MinFloat?.ToString("0.###", CultureInfo.InvariantCulture) ?? "-inf"} .. {definition.MaxFloat?.ToString("0.###", CultureInfo.InvariantCulture) ?? "+inf"})",
+            ParameterValueKind.Integer when definition.MinInt.HasValue || definition.MaxInt.HasValue =>
+                $"{displayName} ({definition.MinInt?.ToString(CultureInfo.InvariantCulture) ?? "-inf"} .. {definition.MaxInt?.ToString(CultureInfo.InvariantCulture) ?? "+inf"})",
+            _ => displayName
+        };
+    }
+
+    private static string GetParameterHint(NodeParameterDefinition definition)
+    {
+        return definition.Kind switch
+        {
+            ParameterValueKind.Float => "Enter decimal value",
+            ParameterValueKind.Integer => "Enter integer value",
+            _ => string.Empty
         };
     }
 
@@ -1282,15 +1709,15 @@ public partial class MainWindow : Window
         };
     }
 
-    private string DescribeEdge(Edge edge)
+    private IBrush ResolveBrush(string resourceKey, string fallbackHex)
     {
-        var fromLabel = _nodeLookup.TryGetValue(edge.FromNodeId, out var fromNode)
-            ? fromNode.Type
-            : edge.FromNodeId.ToString();
-        var toLabel = _nodeLookup.TryGetValue(edge.ToNodeId, out var toNode)
-            ? toNode.Type
-            : edge.ToNodeId.ToString();
-        return $"{fromLabel}.{edge.FromPort} -> {toLabel}.{edge.ToPort}";
+        if (TryGetResource(resourceKey, ActualThemeVariant, out var resource) &&
+            resource is IBrush brush)
+        {
+            return brush;
+        }
+
+        return Brush.Parse(fallbackHex);
     }
 
     private void SetStatus(string message)
@@ -1298,8 +1725,5 @@ public partial class MainWindow : Window
         StatusTextBlock.Text = message;
     }
 
-    private sealed record NodeOption(NodeId Id, string Type)
-    {
-        public override string ToString() => $"{Type} ({Id})";
-    }
+    private readonly record struct PortKey(NodeId NodeId, string PortName, PortDirection Direction);
 }

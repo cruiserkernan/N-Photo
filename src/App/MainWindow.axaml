@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:dock="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia"
+        xmlns:views="clr-namespace:App.Views"
         mc:Ignorable="d"
         d:DesignWidth="1280"
         d:DesignHeight="800"
@@ -13,126 +14,14 @@
         MinWidth="1100"
         MinHeight="700">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Padding="8" Background="#EFEFEF">
-            <StackPanel Spacing="8">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="LoadButton" Content="Load" Click="OnLoadClicked" />
-                    <Button x:Name="ExportButton" Content="Export" Click="OnExportClicked" />
-                    <Button x:Name="BuildChainButton" Content="Build 4-Node Chain" Click="OnBuildChainClicked" />
-                    <Button x:Name="UndoButton" Content="Undo" Click="OnUndoClicked" />
-                    <Button x:Name="RedoButton" Content="Redo" Click="OnRedoClicked" />
-                    <TextBlock x:Name="StatusTextBlock" VerticalAlignment="Center" Text="Ready" />
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <TextBlock VerticalAlignment="Center" Text="Dock" FontWeight="SemiBold" />
-                    <ComboBox x:Name="SourcePanelComboBox" Width="140" />
-                    <TextBlock VerticalAlignment="Center" Text="to" />
-                    <ComboBox x:Name="TargetPanelComboBox" Width="140" />
-                    <Button Content="Tab" Click="OnDockTabClicked" />
-                    <Button Content="Left" Click="OnDockLeftClicked" />
-                    <Button Content="Right" Click="OnDockRightClicked" />
-                    <Button Content="Top" Click="OnDockTopClicked" />
-                    <Button Content="Bottom" Click="OnDockBottomClicked" />
-                </StackPanel>
-            </StackPanel>
-        </Border>
+        <views:TopToolbarView x:Name="TopToolbar" DockPanel.Dock="Top" />
 
         <dock:DockControl x:Name="WorkspaceDockControl" />
 
         <Grid x:Name="PaneSeedGrid" IsVisible="False">
-            <Border x:Name="GraphPanelRoot" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
-                <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*" RowSpacing="10">
-                    <TextBlock Text="Graph Controls" FontWeight="Bold" />
-
-                    <StackPanel Grid.Row="1" Spacing="6">
-                        <TextBlock Text="Add Node" FontWeight="SemiBold" />
-                        <Grid ColumnDefinitions="2*,Auto" ColumnSpacing="6">
-                            <ComboBox x:Name="NodeTypeComboBox" Grid.Column="0" />
-                            <Button x:Name="AddNodeButton" Grid.Column="1" Content="Add" Click="OnAddNodeClicked" />
-                        </Grid>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="2" Spacing="6">
-                        <TextBlock Text="Connect Ports" FontWeight="SemiBold" />
-                        <Grid ColumnDefinitions="2*,1*" ColumnSpacing="6">
-                            <ComboBox x:Name="FromNodeComboBox" Grid.Column="0" SelectionChanged="OnFromNodeSelectionChanged" />
-                            <ComboBox x:Name="FromPortComboBox" Grid.Column="1" />
-                        </Grid>
-                        <Grid ColumnDefinitions="2*,1*" ColumnSpacing="6">
-                            <ComboBox x:Name="ToNodeComboBox" Grid.Column="0" SelectionChanged="OnToNodeSelectionChanged" />
-                            <ComboBox x:Name="ToPortComboBox" Grid.Column="1" />
-                        </Grid>
-                        <Button x:Name="ConnectButton" Content="Connect" Click="OnConnectClicked" />
-                    </StackPanel>
-
-                    <Border Grid.Row="3" BorderBrush="#BDBDBD" BorderThickness="1" Background="#161616" Padding="6">
-                        <Grid RowDefinitions="Auto,*" RowSpacing="6">
-                            <TextBlock Text="Node Canvas" FontWeight="SemiBold" Foreground="#E7E7E7" />
-                            <Canvas x:Name="NodeCanvas"
-                                    Grid.Row="1"
-                                    ClipToBounds="True"
-                                    Height="260"
-                                    Focusable="True"
-                                    PointerPressed="OnNodeCanvasPointerPressed" />
-                        </Grid>
-                    </Border>
-
-                    <Grid Grid.Row="4" ColumnDefinitions="*,*" ColumnSpacing="8">
-                        <StackPanel Grid.Column="0" Spacing="4">
-                            <TextBlock Text="Nodes" FontWeight="SemiBold" />
-                            <ListBox x:Name="NodeListBox" Height="140" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="4">
-                            <TextBlock Text="Edges" FontWeight="SemiBold" />
-                            <ListBox x:Name="EdgeListBox" Height="140" />
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Grid.Row="5"
-                               Text="Graph uses single incoming connection per input port. Middle-drag pans and mouse wheel zooms the node graph. Select a node, then press 1-5 to assign and preview that slot; press 1-5 to switch slots; press 0 to return to output preview."
-                               TextWrapping="Wrap"
-                               Foreground="#6B6B6B" />
-                </Grid>
-            </Border>
-
-            <Border x:Name="ViewerPanelRoot" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
-                <Grid RowDefinitions="Auto,*" RowSpacing="8">
-                    <TextBlock Text="Viewport Preview" FontWeight="Bold" />
-                    <Border Grid.Row="1" BorderBrush="#BDBDBD" BorderThickness="1" Background="#111111">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                            <Image x:Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </ScrollViewer>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <Border x:Name="PropertiesPanelRoot" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="8">
-                    <TextBlock Text="Property Panel" FontWeight="Bold" />
-
-                    <StackPanel Grid.Row="1" Spacing="4">
-                        <TextBlock Text="Node" />
-                        <ComboBox x:Name="ParameterNodeComboBox" SelectionChanged="OnParameterNodeSelectionChanged" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="2" Spacing="4">
-                        <TextBlock Text="Parameter" />
-                        <ComboBox x:Name="ParameterNameComboBox" SelectionChanged="OnParameterNameSelectionChanged" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="3" Spacing="4">
-                        <TextBlock Text="Value" />
-                        <TextBox x:Name="ParameterValueTextBox" Watermark="Type value and click Apply" />
-                        <Button x:Name="ApplyParameterButton" Content="Apply Parameter" Click="OnApplyParameterClicked" />
-                    </StackPanel>
-
-                    <TextBlock Grid.Row="4"
-                               Text="Value format: float/int/bool/enum literal. Example: 1.25, 4, true, multiply."
-                               TextWrapping="Wrap"
-                               Foreground="#6B6B6B" />
-                </Grid>
-            </Border>
+            <views:GraphPanelView x:Name="GraphPanelRoot" />
+            <views:ViewerPanelView x:Name="ViewerPanelRoot" />
+            <views:PropertiesPanelView x:Name="PropertiesPanelRoot" />
         </Grid>
     </DockPanel>
 </Window>

@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="700"
+             d:DesignHeight="620"
+             x:Class="App.Views.ViewerPanelView">
+    <Border Classes="panel-surface panel-surface-viewer">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+            <StackPanel Spacing="2">
+                <TextBlock Classes="panel-title" Text="Viewer" />
+                <TextBlock Classes="panel-subtitle" Text="Output and node slot previews." />
+            </StackPanel>
+
+            <Border Grid.Row="1" Classes="viewer-surface">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <Image x:Name="PreviewImage"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

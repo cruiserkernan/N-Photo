@@ -1,12 +1,212 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dock="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia"
              xmlns:dockFluent="clr-namespace:Dock.Avalonia.Themes.Fluent;assembly=Dock.Avalonia.Themes.Fluent"
              x:Class="App.App"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
+    <Application.Resources>
+        <FontFamily x:Key="FontFamily.Ui">avares://App/Assets/Fonts/IBM-Plex-Sans#IBM Plex Sans</FontFamily>
+        <SolidColorBrush x:Key="Brush.Window.Background">#171A20</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Surface.Base">#1D2229</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Surface.Raised">#242A33</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Surface.Toolbar">#20262E</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Surface.Canvas">#101319</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Chrome.Border">#425062</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Chrome.BorderSoft">#344152</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Text.Primary">#E3E9F3</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Text.Secondary">#B3C0CF</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Text.Muted">#8B97A6</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Accent.Primary">#5DAEEA</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Accent.PrimaryStrong">#74BDF4</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Accent.Subtle">#2A3440</SolidColorBrush>
+
+        <SolidColorBrush x:Key="Brush.NodeCard.Background">#29313B</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.NodeCard.Border">#556274</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.NodeCard.BorderSelected">#65BAF7</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.NodeCard.BorderDragging">#E3B672</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.Graph.Wire">#7EB1DD</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Input">#4F5E70</SolidColorBrush>
+        <SolidColorBrush x:Key="Brush.PortHandle.Output">#78A9D8</SolidColorBrush>
+    </Application.Resources>
 
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme DensityStyle="Compact" />
         <dockFluent:DockFluentTheme />
+
+        <Style Selector="Window">
+            <Setter Property="Background" Value="{DynamicResource Brush.Window.Background}" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+            <Setter Property="FontFamily" Value="{DynamicResource FontFamily.Ui}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style Selector="dock|DockControl">
+            <Setter Property="Background" Value="{DynamicResource Brush.Window.Background}" />
+        </Style>
+
+        <Style Selector="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Accent.Subtle}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Opacity" Value="0.95" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Raised}" />
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+
+        <Style Selector="Button.toolbar-button-primary">
+            <Setter Property="Background" Value="{DynamicResource Brush.Accent.Primary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent.PrimaryStrong}" />
+            <Setter Property="Foreground" Value="#0F141D" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.toolbar-button-primary:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Brush.Accent.PrimaryStrong}" />
+        </Style>
+
+        <Style Selector="Button.node-strip-button">
+            <Setter Property="Background" Value="#2A333F" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="CornerRadius" Value="3" />
+        </Style>
+        <Style Selector="Button.node-strip-button:pointerover">
+            <Setter Property="Background" Value="#344252" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        </Style>
+
+        <Style Selector="Button.action-button-primary">
+            <Setter Property="Background" Value="{DynamicResource Brush.Accent.Primary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent.PrimaryStrong}" />
+            <Setter Property="Foreground" Value="#0F141D" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Base}" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+        </Style>
+
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Base}" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+        </Style>
+
+        <Style Selector="Border.toolbar-surface">
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Toolbar}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.BorderSoft}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+
+        <Style Selector="TextBlock.toolbar-caption">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style Selector="Border.status-pill">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Raised}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="10,4" />
+        </Style>
+
+        <Style Selector="TextBlock.status-text">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style Selector="Border.panel-surface">
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Base}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <Style Selector="TextBlock.panel-title">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        </Style>
+
+        <Style Selector="TextBlock.panel-subtitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}" />
+        </Style>
+
+        <Style Selector="TextBlock.section-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+        </Style>
+
+        <Style Selector="TextBlock.section-label-inverse">
+            <Setter Property="Foreground" Value="#D6E4F2" />
+        </Style>
+
+        <Style Selector="Border.graph-canvas-shell">
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Canvas}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+
+        <Style Selector="Border.viewer-surface">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface.Canvas}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="4" />
+        </Style>
+
+        <Style Selector="Border.hint-shell">
+            <Setter Property="Background" Value="#1B2028" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.BorderSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8" />
+        </Style>
+
+        <Style Selector="TextBlock.hint-text">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style Selector="Border.node-card">
+            <Setter Property="Opacity" Value="0.97" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.1" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.node-card:pointerover">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
     </Application.Styles>
 </Application>
