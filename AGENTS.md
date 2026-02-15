@@ -11,6 +11,13 @@ Use this flow for every feature request:
 5. Validate against acceptance criteria.
 6. Report results and update spec status.
 
+## Bug Fix Workflow (Exception)
+For bug fixes, do not use spec-driven files. Fix bugs directly in code.
+- No architecture spec or feature spec is required for bug-only work.
+- Implement the smallest safe fix, then run relevant checks/tests.
+- Keep changes focused on correcting the bug behavior.
+- Update previous specs only if the bug revealed a spec gap or error that needs correction.
+
 ## Detailed Steps
 1. Create or update the relevant architecture spec in `specs/architecture/` if needed.
 2. Create or update the feature spec in `specs/features/`.
@@ -54,3 +61,9 @@ Use this flow for every feature request:
 ## Naming
 - Architecture specs: `ARCH-###-short-name.md`
 - Feature specs: `FEAT-###-short-name.md`
+
+## 3rd Party Libraries
+- Use only well-maintained, widely adopted libraries with permissive licenses.
+- Document any new dependencies in the architecture spec and justify their use.
+- Avoid adding dependencies for trivial functionality that can be implemented in-house without significant effort or maintenance burden.
+- Regularly review and update dependencies to ensure security and compatibility.

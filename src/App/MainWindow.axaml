@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:dock="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia"
         mc:Ignorable="d"
         d:DesignWidth="1280"
         d:DesignHeight="800"
@@ -13,18 +14,34 @@
         MinHeight="700">
     <DockPanel>
         <Border DockPanel.Dock="Top" Padding="8" Background="#EFEFEF">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="LoadButton" Content="Load" Click="OnLoadClicked" />
-                <Button x:Name="ExportButton" Content="Export" Click="OnExportClicked" />
-                <Button x:Name="BuildChainButton" Content="Build 4-Node Chain" Click="OnBuildChainClicked" />
-                <Button x:Name="UndoButton" Content="Undo" Click="OnUndoClicked" />
-                <Button x:Name="RedoButton" Content="Redo" Click="OnRedoClicked" />
-                <TextBlock x:Name="StatusTextBlock" VerticalAlignment="Center" Text="Ready" />
+            <StackPanel Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="LoadButton" Content="Load" Click="OnLoadClicked" />
+                    <Button x:Name="ExportButton" Content="Export" Click="OnExportClicked" />
+                    <Button x:Name="BuildChainButton" Content="Build 4-Node Chain" Click="OnBuildChainClicked" />
+                    <Button x:Name="UndoButton" Content="Undo" Click="OnUndoClicked" />
+                    <Button x:Name="RedoButton" Content="Redo" Click="OnRedoClicked" />
+                    <TextBlock x:Name="StatusTextBlock" VerticalAlignment="Center" Text="Ready" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center" Text="Dock" FontWeight="SemiBold" />
+                    <ComboBox x:Name="SourcePanelComboBox" Width="140" />
+                    <TextBlock VerticalAlignment="Center" Text="to" />
+                    <ComboBox x:Name="TargetPanelComboBox" Width="140" />
+                    <Button Content="Tab" Click="OnDockTabClicked" />
+                    <Button Content="Left" Click="OnDockLeftClicked" />
+                    <Button Content="Right" Click="OnDockRightClicked" />
+                    <Button Content="Top" Click="OnDockTopClicked" />
+                    <Button Content="Bottom" Click="OnDockBottomClicked" />
+                </StackPanel>
             </StackPanel>
         </Border>
 
-        <Grid ColumnDefinitions="3*,4*,3*" Margin="8" ColumnSpacing="8">
-            <Border Grid.Column="0" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
+        <dock:DockControl x:Name="WorkspaceDockControl" />
+
+        <Grid x:Name="PaneSeedGrid" IsVisible="False">
+            <Border x:Name="GraphPanelRoot" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
                 <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*" RowSpacing="10">
                     <TextBlock Text="Graph Controls" FontWeight="Bold" />
 
@@ -79,7 +96,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
+            <Border x:Name="ViewerPanelRoot" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
                 <Grid RowDefinitions="Auto,*" RowSpacing="8">
                     <TextBlock Text="Viewport Preview" FontWeight="Bold" />
                     <Border Grid.Row="1" BorderBrush="#BDBDBD" BorderThickness="1" Background="#111111">
@@ -90,7 +107,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="2" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
+            <Border x:Name="PropertiesPanelRoot" BorderBrush="#D0D0D0" BorderThickness="1" Padding="10">
                 <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="8">
                     <TextBlock Text="Property Panel" FontWeight="Bold" />
 

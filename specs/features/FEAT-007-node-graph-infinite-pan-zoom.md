@@ -48,6 +48,7 @@ Current node editor behavior is viewport-bounded and does not provide Nuke-like 
 - Zoom gesture: mouse wheel centered at cursor.
 - New nodes spawn at current viewport center.
 - Zoom limits: min `0.35`, max `2.5`, default `1.0`.
+- Viewport clipping and four-side wire anchors were later refined in `specs/features/FEAT-008-node-graph-clipping-and-vertical-arrow-anchors.md`.
 
 ## Validation
 - `dotnet build NPhoto.slnx -c Debug` succeeds.

@@ -9,6 +9,8 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using App.Workspace;
+using Dock.Model.Core;
 using Editor.Domain.Graph;
 using Editor.Domain.Imaging;
 using Editor.Engine;
@@ -47,6 +49,8 @@ public partial class MainWindow : Window
     private readonly List<Control> _wireVisuals = new();
     private readonly Dictionary<int, NodeId> _previewSlots = new();
     private readonly Canvas _graphLayer = new();
+    private readonly Border _graphLayerClipHost = new() { ClipToBounds = true };
+    private WorkspaceLayoutManager? _workspaceLayoutManager;
     private IReadOnlyList<Edge> _edgeSnapshot = Array.Empty<Edge>();
     private NodeId? _activeDragNodeId;
     private NodeId? _selectedNodeId;
@@ -101,11 +105,101 @@ public partial class MainWindow : Window
 
     private void InitializeUiState()
     {
+        InitializeWorkspaceUi();
         EnsureGraphLayer();
         NodeTypeComboBox.ItemsSource = _editorEngine.AvailableNodeTypes;
         NodeTypeComboBox.SelectedIndex = 0;
         RefreshGraphBindings();
         SetStatus("Ready");
+    }
+
+    private void InitializeWorkspaceUi()
+    {
+        DetachSeedPanels();
+
+        _workspaceLayoutManager = new WorkspaceLayoutManager(
+            GraphPanelRoot,
+            ViewerPanelRoot,
+            PropertiesPanelRoot);
+
+        WorkspaceDockControl.Factory = _workspaceLayoutManager.Factory;
+        WorkspaceDockControl.Layout = _workspaceLayoutManager.Layout;
+        WorkspaceDockControl.IsDockingEnabled = true;
+
+        SourcePanelComboBox.ItemsSource = _workspaceLayoutManager.PanelOptions;
+        TargetPanelComboBox.ItemsSource = _workspaceLayoutManager.PanelOptions;
+        SourcePanelComboBox.SelectedItem = _workspaceLayoutManager.PanelOptions[0];
+        TargetPanelComboBox.SelectedItem = _workspaceLayoutManager.PanelOptions[1];
+    }
+
+    private void DetachSeedPanels()
+    {
+        PaneSeedGrid.Children.Remove(GraphPanelRoot);
+        PaneSeedGrid.Children.Remove(ViewerPanelRoot);
+        PaneSeedGrid.Children.Remove(PropertiesPanelRoot);
+    }
+
+    private void OnDockTabClicked(object? sender, RoutedEventArgs e)
+    {
+        if (!TryGetWorkspaceCommandPanels(out var source, out var target))
+        {
+            return;
+        }
+
+        if (_workspaceLayoutManager is null || !_workspaceLayoutManager.TryDockAsTab(source, target))
+        {
+            SetStatus("Dock tab action failed.");
+            return;
+        }
+
+        SetStatus($"Docked {source} as a tab with {target}.");
+    }
+
+    private void OnDockLeftClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Left);
+
+    private void OnDockRightClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Right);
+
+    private void OnDockTopClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Top);
+
+    private void OnDockBottomClicked(object? sender, RoutedEventArgs e) => DockWithOperation(DockOperation.Bottom);
+
+    private void DockWithOperation(DockOperation operation)
+    {
+        if (!TryGetWorkspaceCommandPanels(out var source, out var target))
+        {
+            return;
+        }
+
+        if (_workspaceLayoutManager is null || !_workspaceLayoutManager.TrySplit(source, target, operation))
+        {
+            SetStatus($"Dock {operation} action failed.");
+            return;
+        }
+
+        SetStatus($"Docked {source} {operation.ToString().ToLowerInvariant()} of {target}.");
+    }
+
+    private bool TryGetWorkspaceCommandPanels(out WorkspacePanelId source, out WorkspacePanelId target)
+    {
+        source = default;
+        target = default;
+
+        if (SourcePanelComboBox.SelectedItem is not WorkspacePanelOption sourceOption ||
+            TargetPanelComboBox.SelectedItem is not WorkspacePanelOption targetOption)
+        {
+            SetStatus("Select source and target panels first.");
+            return false;
+        }
+
+        source = sourceOption.Id;
+        target = targetOption.Id;
+        if (source == target)
+        {
+            SetStatus("Source and target panels must be different.");
+            return false;
+        }
+
+        return true;
     }
 
     private async void OnLoadClicked(object? sender, RoutedEventArgs e)
@@ -605,8 +699,9 @@ public partial class MainWindow : Window
         {
             _panOffset = new Vector(e.NewSize.Width / 2, e.NewSize.Height / 2);
             _isViewTransformInitialized = true;
-            ApplyGraphTransform();
         }
+
+        ApplyGraphTransform();
 
         if (_nodePositions.Count == 0)
         {
@@ -829,19 +924,17 @@ public partial class MainWindow : Window
             var fromCardHeight = GetCardHeight(edge.FromNodeId);
             var toCardWidth = GetCardWidth(edge.ToNodeId);
             var toCardHeight = GetCardHeight(edge.ToNodeId);
-            var fromCenterX = fromPosition.X + (fromCardWidth / 2);
-            var toCenterX = toPosition.X + (toCardWidth / 2);
-            var isLeftToRight = fromCenterX <= toCenterX;
-            var sourceAnchor = new Point(
-                isLeftToRight ? fromPosition.X + fromCardWidth : fromPosition.X,
+            var fromCenter = new Point(
+                fromPosition.X + (fromCardWidth / 2),
                 fromPosition.Y + (fromCardHeight / 2));
-            var targetAnchor = new Point(
-                isLeftToRight ? toPosition.X : toPosition.X + toCardWidth,
+            var toCenter = new Point(
+                toPosition.X + (toCardWidth / 2),
                 toPosition.Y + (toCardHeight / 2));
-
-            var middleX = (sourceAnchor.X + targetAnchor.X) / 2;
-            var bendA = new Point(middleX, sourceAnchor.Y);
-            var bendB = new Point(middleX, targetAnchor.Y);
+            var delta = new Vector(toCenter.X - fromCenter.X, toCenter.Y - fromCenter.Y);
+            var isHorizontalDominant = Math.Abs(delta.X) >= Math.Abs(delta.Y);
+            var sourceAnchor = ResolveSourceAnchor(fromPosition, fromCardWidth, fromCardHeight, delta, isHorizontalDominant);
+            var targetAnchor = ResolveTargetAnchor(toPosition, toCardWidth, toCardHeight, delta, isHorizontalDominant);
+            var (bendA, bendB) = ResolveOrthogonalBends(sourceAnchor, targetAnchor, isHorizontalDominant);
 
             var wire = new Polyline
             {
@@ -857,6 +950,57 @@ public partial class MainWindow : Window
             _wireVisuals.Add(wire);
             _wireVisuals.Add(arrow);
         }
+    }
+
+    private static Point ResolveSourceAnchor(
+        Point fromPosition,
+        double fromWidth,
+        double fromHeight,
+        Vector delta,
+        bool isHorizontalDominant)
+    {
+        return isHorizontalDominant
+            ? new Point(
+                delta.X >= 0 ? fromPosition.X + fromWidth : fromPosition.X,
+                fromPosition.Y + (fromHeight / 2))
+            : new Point(
+                fromPosition.X + (fromWidth / 2),
+                delta.Y >= 0 ? fromPosition.Y + fromHeight : fromPosition.Y);
+    }
+
+    private static Point ResolveTargetAnchor(
+        Point toPosition,
+        double toWidth,
+        double toHeight,
+        Vector delta,
+        bool isHorizontalDominant)
+    {
+        return isHorizontalDominant
+            ? new Point(
+                delta.X >= 0 ? toPosition.X : toPosition.X + toWidth,
+                toPosition.Y + (toHeight / 2))
+            : new Point(
+                toPosition.X + (toWidth / 2),
+                delta.Y >= 0 ? toPosition.Y : toPosition.Y + toHeight);
+    }
+
+    private static (Point BendA, Point BendB) ResolveOrthogonalBends(
+        Point sourceAnchor,
+        Point targetAnchor,
+        bool isHorizontalDominant)
+    {
+        if (isHorizontalDominant)
+        {
+            var middleX = (sourceAnchor.X + targetAnchor.X) / 2;
+            return (
+                new Point(middleX, sourceAnchor.Y),
+                new Point(middleX, targetAnchor.Y));
+        }
+
+        var middleY = (sourceAnchor.Y + targetAnchor.Y) / 2;
+        return (
+            new Point(sourceAnchor.X, middleY),
+            new Point(targetAnchor.X, middleY));
     }
 
     private static bool TryMapPreviewSlot(Key key, out int slot)
@@ -942,19 +1086,25 @@ public partial class MainWindow : Window
 
     private void EnsureGraphLayer()
     {
-        if (NodeCanvas.Children.Count == 1 && ReferenceEquals(NodeCanvas.Children[0], _graphLayer))
+        if (NodeCanvas.Children.Count == 1 && ReferenceEquals(NodeCanvas.Children[0], _graphLayerClipHost))
         {
             return;
         }
 
         NodeCanvas.Children.Clear();
-        NodeCanvas.Children.Add(_graphLayer);
+        _graphLayerClipHost.Child = _graphLayer;
+        NodeCanvas.Children.Add(_graphLayerClipHost);
+        Canvas.SetLeft(_graphLayerClipHost, 0);
+        Canvas.SetTop(_graphLayerClipHost, 0);
+        UpdateGraphViewportClip();
         ApplyGraphTransform();
     }
 
     private bool IsCanvasBackgroundSource(object? source)
     {
-        return ReferenceEquals(source, NodeCanvas) || ReferenceEquals(source, _graphLayer);
+        return ReferenceEquals(source, NodeCanvas) ||
+               ReferenceEquals(source, _graphLayer) ||
+               ReferenceEquals(source, _graphLayerClipHost);
     }
 
     private void StopCanvasPan()
@@ -964,12 +1114,24 @@ public partial class MainWindow : Window
 
     private void ApplyGraphTransform()
     {
+        UpdateGraphViewportClip();
         var transforms = new Transforms
         {
             new ScaleTransform(_zoomScale, _zoomScale),
             new TranslateTransform(_panOffset.X, _panOffset.Y)
         };
         _graphLayer.RenderTransform = new TransformGroup { Children = transforms };
+    }
+
+    private void UpdateGraphViewportClip()
+    {
+        var viewportWidth = Math.Max(0, NodeCanvas.Bounds.Width);
+        var viewportHeight = Math.Max(0, NodeCanvas.Bounds.Height);
+        _graphLayerClipHost.Width = viewportWidth;
+        _graphLayerClipHost.Height = viewportHeight;
+
+        NodeCanvas.Clip = new RectangleGeometry(new Rect(0, 0, viewportWidth, viewportHeight));
+        _graphLayerClipHost.Clip = new RectangleGeometry(new Rect(0, 0, viewportWidth, viewportHeight));
     }
 
     private Point ScreenToWorld(Point screenPoint)
