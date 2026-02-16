@@ -1,7 +1,7 @@
 # ARCH-012: Shell Redesign and Presentation Architecture
 
 - Status: Implemented
-- Last Updated: 2026-02-15
+- Last Updated: 2026-02-16
 - Scope: Presentation-layer structuring and shell toolbar redesign with searchable node creation
 
 ## Goals
@@ -17,11 +17,25 @@
 - `MainWindow` now depends on `IEditorSession` instead of `IEditorEngine`.
 - Preview-slot logic migrated to `PreviewRoutingController`.
 - Graph bend routing now uses `GraphInteractionController` helper.
+- Graph wire geometry utilities now live in `GraphWireGeometryController`.
 - Toolbar redesign shipped in `TopToolbarView`:
   - grouped command clusters (`File`, `Edit`, `Node`)
   - node search box + add action
   - retained quick node strip
   - status surface preserved
+- `MainWindow` shell code-behind is further decomposed into focused partials:
+  - composition
+  - lifecycle
+  - toolbar commands
+  - keyboard routing
+  - selection/status
+- Graph canvas code-behind is further decomposed into focused partials:
+  - state/rendering
+  - node card + port visuals
+  - input handling
+  - connection drag behavior
+  - viewport utilities
+- Parameter editor primitives are modularized into per-primitive files under `Controllers/ParameterEditors`.
 
 ## Boundaries
 - App shell interacts with editor runtime through `IEditorSession`.

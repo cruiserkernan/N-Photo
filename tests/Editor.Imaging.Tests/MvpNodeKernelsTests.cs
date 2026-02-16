@@ -79,4 +79,47 @@ public class MvpNodeKernelsTests
         Assert.Equal(0.9f, pixel.G, 3);
         Assert.Equal(0.9f, pixel.B, 3);
     }
+
+    [Fact]
+    public void Blend_TypedMode_MultiplyUsesChannelProduct()
+    {
+        var baseImage = new RgbaImage(1, 1);
+        baseImage.SetPixel(0, 0, new RgbaColor(0.5f, 0.8f, 0.25f, 1.0f));
+        var topImage = new RgbaImage(1, 1);
+        topImage.SetPixel(0, 0, new RgbaColor(0.4f, 0.5f, 0.8f, 1.0f));
+
+        var output = MvpNodeKernels.Blend(baseImage, topImage, BlendMode.Multiply, opacity: 1.0f);
+        var pixel = output.GetPixel(0, 0);
+
+        Assert.Equal(0.2f, pixel.R, 3);
+        Assert.Equal(0.4f, pixel.G, 3);
+        Assert.Equal(0.2f, pixel.B, 3);
+    }
+
+    [Theory]
+    [InlineData("over", BlendMode.Over)]
+    [InlineData("multiply", BlendMode.Multiply)]
+    [InlineData("screen", BlendMode.Screen)]
+    public void Blend_StringOverload_MatchesTypedOverload(string modeText, BlendMode mode)
+    {
+        var baseImage = TestImageFactory.CreateGradient(8, 8);
+        var topImage = TestImageFactory.CreateGradient(8, 8);
+
+        var typed = MvpNodeKernels.Blend(baseImage, topImage, mode, opacity: 0.7f);
+        var text = MvpNodeKernels.Blend(baseImage, topImage, modeText, opacity: 0.7f);
+
+        Assert.Equal(typed.ToRgba8(), text.ToRgba8());
+    }
+
+    [Fact]
+    public void Blend_UnknownMode_FallsBackToOver()
+    {
+        var baseImage = TestImageFactory.CreateGradient(6, 6);
+        var topImage = TestImageFactory.CreateGradient(6, 6);
+
+        var fallback = MvpNodeKernels.Blend(baseImage, topImage, "not-a-mode", opacity: 0.8f);
+        var over = MvpNodeKernels.Blend(baseImage, topImage, BlendMode.Over, opacity: 0.8f);
+
+        Assert.Equal(over.ToRgba8(), fallback.ToRgba8());
+    }
 }

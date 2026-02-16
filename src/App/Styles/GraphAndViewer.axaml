@@ -1,0 +1,29 @@
+<Styles xmlns="https://github.com/avaloniaui">
+    <Style Selector="Border.graph-canvas-shell">
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface.Canvas}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <Style Selector="Border.viewer-surface">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface.Canvas}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="4" />
+    </Style>
+
+    <Style Selector="Border.node-card">
+        <Setter Property="Opacity" Value="0.97" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.1" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.node-card:pointerover">
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+</Styles>

@@ -1,0 +1,97 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:dock="clr-namespace:Dock.Avalonia.Controls;assembly=Dock.Avalonia">
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource Brush.Window.Background}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="FontFamily" Value="{DynamicResource FontFamily.Ui}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="dock|DockControl">
+        <Setter Property="Background" Value="{DynamicResource Brush.Window.Background}" />
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent.Subtle}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="Opacity" Value="0.95" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button:pointerover">
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface.Raised}" />
+    </Style>
+    <Style Selector="Button:pressed">
+        <Setter Property="Opacity" Value="0.9" />
+    </Style>
+
+    <Style Selector="Button.toolbar-button-primary">
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent.Primary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent.PrimaryStrong}" />
+        <Setter Property="Foreground" Value="#0F141D" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.toolbar-button-primary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent.PrimaryStrong}" />
+    </Style>
+
+    <Style Selector="Button.node-strip-button">
+        <Setter Property="Background" Value="#2A333F" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="CornerRadius" Value="3" />
+    </Style>
+    <Style Selector="Button.node-strip-button:pointerover">
+        <Setter Property="Background" Value="#344252" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+    </Style>
+
+    <Style Selector="Button.action-button-primary">
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent.Primary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent.PrimaryStrong}" />
+        <Setter Property="Foreground" Value="#0F141D" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="ComboBox">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface.Base}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,5" />
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface.Base}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Chrome.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,5" />
+    </Style>
+
+    <Style Selector="TextBlock.section-label">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+    </Style>
+
+    <Style Selector="TextBlock.section-label-inverse">
+        <Setter Property="Foreground" Value="#D6E4F2" />
+    </Style>
+
+    <Style Selector="TextBlock.hint-text">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Muted}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+</Styles>

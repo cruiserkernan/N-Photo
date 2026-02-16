@@ -1,7 +1,7 @@
 # ARCH-000: Current System Architecture (Living)
 
 - Status: Implemented
-- Last Updated: 2026-02-15
+- Last Updated: 2026-02-16
 - Scope: Canonical, continuously updated architecture baseline for N-Photo
 
 ## Purpose
@@ -32,11 +32,21 @@
   - color
 - Nodes can select property UI presentation through `NodeParameterDefinition.EditorPrimitive`.
 - Graph and viewer both use shared pan/zoom math via `PanZoomController`.
+- Graph wire geometry math is centralized in `GraphWireGeometryController` (arrowheads, line-grab segments, segment distance, tip offsets).
+- Blend mode handling supports typed `BlendMode` with compatibility parsing for legacy string modes.
 
 ## UI Composition
 - `MainWindow` is split into partial files by responsibility:
-  - shell/orchestration
-  - graph canvas behavior
+  - composition/dependency wiring
+  - lifecycle/event binding
+  - toolbar commands and node-add/search
+  - keyboard preview routing
+  - selection/status/properties orchestration
+  - graph canvas state
+  - graph node-card/port composition
+  - graph input handling
+  - graph connection-drag behavior
+  - graph viewport utilities
   - viewer viewport behavior
 - Graph canvas uses world-space pan/zoom with connection-drag wire routing.
 - Graph canvas directed topology:
@@ -45,6 +55,7 @@
   - mask inputs on right edge
 - Graph canvas wire rendering is center-routed and clipped to dynamic node border intersections; connected edges show arrowheads on destination inputs only, while unconnected input/output stubs keep arrowheads for affordance.
 - Viewer panel supports pan/zoom navigation with fit-to-image initialization.
+- App visual resources/styles are organized through merged dictionaries under `src/App/Styles/`.
 
 ## Maintenance Rules
 - Keep this doc current after each implemented feature or refactor that changes architecture.
