@@ -35,4 +35,37 @@ public class EditorSessionTests
         var node = session.GetSnapshot().Nodes.Single(candidate => candidate.Id == nodeId);
         Assert.Equal(NodeTypes.Blur, node.Type);
     }
+
+    [Fact]
+    public void CaptureAndLoadGraphDocument_RoundTripsThroughSessionBoundary()
+    {
+        var registry = new BuiltInNodeModuleRegistry();
+        var engine = new BootstrapEditorEngine(registry);
+        var session = new EditorSession(engine, registry);
+        var baseline = session.CaptureGraphDocument();
+
+        session.AddNode(new NodeTypeId(NodeTypes.Transform));
+        var mutated = session.CaptureGraphDocument();
+        Assert.NotEqual(baseline.Nodes.Count, mutated.Nodes.Count);
+
+        session.LoadGraphDocument(baseline);
+        var restored = session.CaptureGraphDocument();
+
+        Assert.Equal(baseline.InputNodeId, restored.InputNodeId);
+        Assert.Equal(baseline.OutputNodeId, restored.OutputNodeId);
+        Assert.Equal(
+            baseline.Nodes.Select(CreateGraphNodeSignature),
+            restored.Nodes.Select(CreateGraphNodeSignature));
+        Assert.Equal(baseline.Edges, restored.Edges);
+    }
+
+    private static string CreateGraphNodeSignature(GraphNodeState node)
+    {
+        var parameterSignature = string.Join(
+            "|",
+            node.Parameters
+                .OrderBy(parameter => parameter.Key, StringComparer.Ordinal)
+                .Select(parameter => $"{parameter.Key}:{parameter.Value.Kind}:{parameter.Value.Value}"));
+        return $"{node.NodeId.Value:N}:{node.NodeType}:{parameterSignature}";
+    }
 }

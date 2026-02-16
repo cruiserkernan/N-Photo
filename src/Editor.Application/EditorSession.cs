@@ -78,6 +78,16 @@ public sealed class EditorSession : IEditorSession, IDisposable
         _engine.SetInputImage(nodeId, image);
     }
 
+    public GraphDocumentState CaptureGraphDocument()
+    {
+        return _engine.CaptureGraphDocument();
+    }
+
+    public void LoadGraphDocument(GraphDocumentState document)
+    {
+        _engine.LoadGraphDocument(document);
+    }
+
     public bool TryRenderOutput(out RgbaImage? image, out string errorMessage, NodeId? targetNodeId = null)
     {
         return _engine.TryRenderOutput(out image, out errorMessage, targetNodeId);

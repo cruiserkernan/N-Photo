@@ -122,9 +122,9 @@ public sealed class BootstrapEditorEngine : IEditorEngine, IDisposable
         }
     }
 
-    public NodeId InputNodeId { get; }
+    public NodeId InputNodeId { get; private set; }
 
-    public NodeId OutputNodeId { get; }
+    public NodeId OutputNodeId { get; private set; }
 
     public NodeId AddNode(string nodeType)
     {
@@ -224,6 +224,68 @@ public sealed class BootstrapEditorEngine : IEditorEngine, IDisposable
             _inputImageStore.Set(nodeId, image);
             _tileCache.Clear();
             Status = $"Image loaded for {nodeId}";
+            RequestPreviewRenderLocked(null);
+        }
+    }
+
+    public GraphDocumentState CaptureGraphDocument()
+    {
+        lock (_sync)
+        {
+            var nodes = _graph.Nodes
+                .OrderBy(node => node.Id.Value)
+                .Select(node => new GraphNodeState(
+                    node.Id,
+                    node.Type,
+                    node.Parameters
+                        .OrderBy(parameter => parameter.Key, StringComparer.Ordinal)
+                        .ToDictionary(parameter => parameter.Key, parameter => parameter.Value, StringComparer.Ordinal)))
+                .ToArray();
+
+            var edges = _graph.Edges
+                .OrderBy(edge => edge.FromNodeId.Value)
+                .ThenBy(edge => edge.FromPort, StringComparer.Ordinal)
+                .ThenBy(edge => edge.ToNodeId.Value)
+                .ThenBy(edge => edge.ToPort, StringComparer.Ordinal)
+                .ToArray();
+
+            return new GraphDocumentState(
+                InputNodeId,
+                OutputNodeId,
+                nodes,
+                edges);
+        }
+    }
+
+    public void LoadGraphDocument(GraphDocumentState document)
+    {
+        if (document is null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        lock (_sync)
+        {
+            var validated = ValidateDocumentState(document);
+
+            _graph.Clear();
+            foreach (var node in validated.Nodes)
+            {
+                _graph.AddNode(new Node(node.NodeId, node.NodeType, node.Parameters));
+            }
+
+            foreach (var edge in validated.Edges)
+            {
+                _graph.AddEdge(edge, _dagValidator);
+            }
+
+            InputNodeId = validated.InputNodeId;
+            OutputNodeId = validated.OutputNodeId;
+            _commandProcessor.Reset();
+            _inputImageStore.Clear();
+            _tileCache.Clear();
+            _lastOutput = null;
+            Status = "Graph document loaded";
             RequestPreviewRenderLocked(null);
         }
     }
@@ -336,5 +398,119 @@ public sealed class BootstrapEditorEngine : IEditorEngine, IDisposable
             _inputImageStore.Snapshot(),
             _tileCache,
             cancellationToken);
+    }
+
+    private GraphDocumentState ValidateDocumentState(GraphDocumentState document)
+    {
+        if (document.Nodes is null || document.Nodes.Count == 0)
+        {
+            throw new InvalidOperationException("Graph document must contain at least one node.");
+        }
+
+        if (document.Edges is null)
+        {
+            throw new InvalidOperationException("Graph document edges are required.");
+        }
+
+        var normalizedNodes = new List<GraphNodeState>(document.Nodes.Count);
+        var seenNodeIds = new HashSet<NodeId>();
+        foreach (var node in document.Nodes)
+        {
+            if (!seenNodeIds.Add(node.NodeId))
+            {
+                throw new InvalidOperationException($"Duplicate node id '{node.NodeId}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(node.NodeType))
+            {
+                throw new InvalidOperationException($"Node '{node.NodeId}' has an empty type.");
+            }
+
+            if (node.Parameters is null)
+            {
+                throw new InvalidOperationException($"Node '{node.NodeId}' parameters are required.");
+            }
+
+            var normalizedParameters = node.Parameters
+                .OrderBy(parameter => parameter.Key, StringComparer.Ordinal)
+                .ToDictionary(
+                    parameter => parameter.Key,
+                    parameter => parameter.Value,
+                    StringComparer.Ordinal);
+
+            normalizedNodes.Add(new GraphNodeState(node.NodeId, node.NodeType, normalizedParameters));
+        }
+
+        if (!seenNodeIds.Contains(document.InputNodeId))
+        {
+            throw new InvalidOperationException($"Input node '{document.InputNodeId}' does not exist.");
+        }
+
+        if (!seenNodeIds.Contains(document.OutputNodeId))
+        {
+            throw new InvalidOperationException($"Output node '{document.OutputNodeId}' does not exist.");
+        }
+
+        var nodeById = normalizedNodes.ToDictionary(node => node.NodeId);
+        if (!string.Equals(nodeById[document.InputNodeId].NodeType, NodeTypes.ImageInput, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Input node '{document.InputNodeId}' must be type '{NodeTypes.ImageInput}'.");
+        }
+
+        if (!string.Equals(nodeById[document.OutputNodeId].NodeType, NodeTypes.Output, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Output node '{document.OutputNodeId}' must be type '{NodeTypes.Output}'.");
+        }
+
+        var normalizedEdges = document.Edges
+            .OrderBy(edge => edge.FromNodeId.Value)
+            .ThenBy(edge => edge.FromPort, StringComparer.Ordinal)
+            .ThenBy(edge => edge.ToNodeId.Value)
+            .ThenBy(edge => edge.ToPort, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var edge in normalizedEdges)
+        {
+            if (string.IsNullOrWhiteSpace(edge.FromPort) || string.IsNullOrWhiteSpace(edge.ToPort))
+            {
+                throw new InvalidOperationException("Edges must provide both source and destination port names.");
+            }
+        }
+
+        var validationGraph = new NodeGraph();
+        foreach (var node in normalizedNodes.OrderBy(node => node.NodeId.Value))
+        {
+            validationGraph.AddNode(new Node(node.NodeId, node.NodeType, node.Parameters));
+        }
+
+        foreach (var edge in normalizedEdges)
+        {
+            validationGraph.AddEdge(edge, _dagValidator);
+        }
+
+        var validatedNodes = validationGraph.Nodes
+            .OrderBy(node => node.Id.Value)
+            .Select(node => new GraphNodeState(
+                node.Id,
+                node.Type,
+                node.Parameters
+                    .OrderBy(parameter => parameter.Key, StringComparer.Ordinal)
+                    .ToDictionary(parameter => parameter.Key, parameter => parameter.Value, StringComparer.Ordinal)))
+            .ToArray();
+
+        var validatedEdges = validationGraph.Edges
+            .OrderBy(edge => edge.FromNodeId.Value)
+            .ThenBy(edge => edge.FromPort, StringComparer.Ordinal)
+            .ThenBy(edge => edge.ToNodeId.Value)
+            .ThenBy(edge => edge.ToPort, StringComparer.Ordinal)
+            .ToArray();
+
+        return new GraphDocumentState(
+            document.InputNodeId,
+            document.OutputNodeId,
+            validatedNodes,
+            validatedEdges);
     }
 }

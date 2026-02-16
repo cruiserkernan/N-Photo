@@ -14,6 +14,7 @@ public sealed class PropertiesPanelController
     private readonly Func<NodeId, string, string?> _resolveNodeActionDisplayText;
     private readonly Action _refreshGraphBindings;
     private readonly Action<string> _setStatus;
+    private readonly Action _notifyMutation;
     private readonly ParameterEditorPrimitiveRegistry _primitiveRegistry;
 
     public PropertiesPanelController(
@@ -22,6 +23,7 @@ public sealed class PropertiesPanelController
         Func<NodeId, string, string?> resolveNodeActionDisplayText,
         Action refreshGraphBindings,
         Action<string> setStatus,
+        Action? notifyMutation = null,
         ParameterEditorPrimitiveRegistry? primitiveRegistry = null)
     {
         _editorSession = editorSession;
@@ -29,6 +31,7 @@ public sealed class PropertiesPanelController
         _resolveNodeActionDisplayText = resolveNodeActionDisplayText;
         _refreshGraphBindings = refreshGraphBindings;
         _setStatus = setStatus;
+        _notifyMutation = notifyMutation ?? (() => { });
         _primitiveRegistry = primitiveRegistry ?? ParameterEditorPrimitiveRegistry.CreateDefault();
     }
 
@@ -173,6 +176,7 @@ public sealed class PropertiesPanelController
             _editorSession.SetParameter(nodeId, definition.Name, value);
             _refreshGraphBindings();
             _setStatus($"Updated {nodeType}.{definition.Name}");
+            _notifyMutation();
         }
         catch (Exception exception)
         {

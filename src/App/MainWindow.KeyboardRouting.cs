@@ -9,6 +9,11 @@ public partial class MainWindow
 {
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        if (TryHandleProjectShortcut(e))
+        {
+            return;
+        }
+
         if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
         {
             return;
@@ -24,6 +29,7 @@ public partial class MainWindow
             _previewRouting.Reset();
             _editorSession.RequestPreviewRender();
             SetStatus("Preview reset to output.");
+            OnPersistentStateMutated();
             e.Handled = true;
             return;
         }
@@ -38,6 +44,7 @@ public partial class MainWindow
             _previewRouting.AssignSlot(slot, selectedNodeId);
             RequestPreviewForActiveSlot();
             SetStatus($"Assigned preview slot {slot} to {_nodeLookup[selectedNodeId].Type}.");
+            OnPersistentStateMutated();
             e.Handled = true;
             return;
         }
@@ -52,6 +59,7 @@ public partial class MainWindow
         _previewRouting.Activate(slot);
         RequestPreviewForActiveSlot();
         SetStatus($"Preview slot {slot} activated.");
+        OnPersistentStateMutated();
         e.Handled = true;
     }
 

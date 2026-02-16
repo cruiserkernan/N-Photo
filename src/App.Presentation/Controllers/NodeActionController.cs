@@ -12,6 +12,7 @@ public sealed class NodeActionController
     private readonly Action _requestPreviewForActiveSlot;
     private readonly Action _refreshPropertiesEditor;
     private readonly Action<string> _setStatus;
+    private readonly Action _notifyMutation;
     private readonly Dictionary<string, Func<NodeId, Task>> _handlers;
     private readonly Dictionary<NodeActionDisplayKey, string> _displayValues = new();
 
@@ -21,7 +22,8 @@ public sealed class NodeActionController
         Func<string, Task<string?>> pickImagePathAsync,
         Action requestPreviewForActiveSlot,
         Action refreshPropertiesEditor,
-        Action<string> setStatus)
+        Action<string> setStatus,
+        Action? notifyMutation = null)
     {
         _editorSession = editorSession;
         _imageLoader = imageLoader;
@@ -29,6 +31,7 @@ public sealed class NodeActionController
         _requestPreviewForActiveSlot = requestPreviewForActiveSlot;
         _refreshPropertiesEditor = refreshPropertiesEditor;
         _setStatus = setStatus;
+        _notifyMutation = notifyMutation ?? (() => { });
         _handlers = new Dictionary<string, Func<NodeId, Task>>(StringComparer.Ordinal)
         {
             [NodeActionIds.PickImageSource] = LoadImageIntoNodeAsync
@@ -52,6 +55,63 @@ public sealed class NodeActionController
             : null;
     }
 
+    public IReadOnlyDictionary<NodeId, string> CaptureImageSourceBindings()
+    {
+        return _displayValues
+            .Where(entry => string.Equals(entry.Key.ActionId, NodeActionIds.PickImageSource, StringComparison.Ordinal))
+            .ToDictionary(entry => entry.Key.NodeId, entry => entry.Value);
+    }
+
+    public void RestoreImageSourceBindings(IReadOnlyDictionary<NodeId, string> bindings)
+    {
+        var staleKeys = _displayValues.Keys
+            .Where(key => string.Equals(key.ActionId, NodeActionIds.PickImageSource, StringComparison.Ordinal))
+            .ToArray();
+        foreach (var staleKey in staleKeys)
+        {
+            _displayValues.Remove(staleKey);
+        }
+
+        foreach (var (nodeId, path) in bindings)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            _displayValues[new NodeActionDisplayKey(nodeId, NodeActionIds.PickImageSource)] = path;
+        }
+    }
+
+    public bool TryLoadImageSourceBinding(NodeId nodeId, string path, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            errorMessage = "Image path is required.";
+            return false;
+        }
+
+        if (!_imageLoader.TryLoad(path, out var image, out var loadError) || image is null)
+        {
+            errorMessage = loadError;
+            return false;
+        }
+
+        try
+        {
+            _editorSession.SetInputImage(nodeId, image);
+            _displayValues[new NodeActionDisplayKey(nodeId, NodeActionIds.PickImageSource)] = path;
+            _notifyMutation();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            errorMessage = exception.Message;
+            return false;
+        }
+    }
+
     public void PruneUnavailableNodes(IReadOnlySet<NodeId> liveNodeIds)
     {
         var staleKeys = _displayValues.Keys
@@ -71,24 +131,15 @@ public sealed class NodeActionController
             return;
         }
 
-        if (!_imageLoader.TryLoad(path, out var image, out var error) || image is null)
+        if (!TryLoadImageSourceBinding(nodeId, path, out var errorMessage))
         {
-            _setStatus($"Load failed: {error}");
+            _setStatus($"Load failed: {errorMessage}");
             return;
         }
 
-        try
-        {
-            _editorSession.SetInputImage(nodeId, image);
-            _displayValues[new NodeActionDisplayKey(nodeId, NodeActionIds.PickImageSource)] = path;
-            _requestPreviewForActiveSlot();
-            _setStatus($"Loaded {Path.GetFileName(path)} into {nodeId}.");
-            _refreshPropertiesEditor();
-        }
-        catch (Exception exception)
-        {
-            _setStatus($"Load failed: {exception.Message}");
-        }
+        _requestPreviewForActiveSlot();
+        _setStatus($"Loaded {Path.GetFileName(path)} into {nodeId}.");
+        _refreshPropertiesEditor();
     }
 
     private readonly record struct NodeActionDisplayKey(NodeId NodeId, string ActionId);

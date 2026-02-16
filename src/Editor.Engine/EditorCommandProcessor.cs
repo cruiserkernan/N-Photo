@@ -57,4 +57,10 @@ internal sealed class EditorCommandProcessor
         _onGraphMutated();
         return true;
     }
+
+    public void Reset()
+    {
+        _undoStack.Clear();
+        _redoStack.Clear();
+    }
 }

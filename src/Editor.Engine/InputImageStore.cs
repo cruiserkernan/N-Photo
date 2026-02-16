@@ -38,4 +38,9 @@ internal sealed class InputImageStore
             _images.Remove(key);
         }
     }
+
+    public void Clear()
+    {
+        _images.Clear();
+    }
 }

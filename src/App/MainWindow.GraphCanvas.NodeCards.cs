@@ -225,6 +225,7 @@ public partial class MainWindow
     {
         card.BorderBrush = _selectedNodeId == nodeId ? _nodeCardSelectedBorder : _nodeCardBorder;
         _activeDragNodeId = null;
+        OnPersistentStateMutated();
 
         if (_nodeLookup.TryGetValue(nodeId, out var node))
         {

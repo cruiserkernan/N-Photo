@@ -76,6 +76,56 @@ public sealed class NodeActionControllerTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => controller.ExecuteAsync(nodeId, "UnknownAction"));
     }
 
+    [Fact]
+    public async Task CaptureAndRestoreImageSourceBindings_RoundTripDisplayValues()
+    {
+        var registry = new BuiltInNodeModuleRegistry();
+        using var session = new EditorSession(new BootstrapEditorEngine(registry), registry);
+        var nodeId = session.GetSnapshot().InputNodeId;
+        var selectedPath = @"C:\images\source.png";
+        var controller = new NodeActionController(
+            session,
+            new StubImageLoader(new RgbaImage(1, 1)),
+            _ => Task.FromResult<string?>(selectedPath),
+            () => { },
+            () => { },
+            _ => { });
+
+        await controller.ExecuteAsync(nodeId, NodeActionIds.PickImageSource);
+        var snapshot = controller.CaptureImageSourceBindings();
+
+        var restored = new NodeActionController(
+            session,
+            new StubImageLoader(new RgbaImage(1, 1)),
+            _ => Task.FromResult<string?>(null),
+            () => { },
+            () => { },
+            _ => { });
+        restored.RestoreImageSourceBindings(snapshot);
+
+        Assert.Equal(selectedPath, restored.ResolveDisplayText(nodeId, NodeActionIds.PickImageSource));
+    }
+
+    [Fact]
+    public void TryLoadImageSourceBinding_LoadsImageAndStoresPath()
+    {
+        var registry = new BuiltInNodeModuleRegistry();
+        using var session = new EditorSession(new BootstrapEditorEngine(registry), registry);
+        var nodeId = session.GetSnapshot().InputNodeId;
+        var controller = new NodeActionController(
+            session,
+            new StubImageLoader(new RgbaImage(1, 1)),
+            _ => Task.FromResult<string?>(null),
+            () => { },
+            () => { },
+            _ => { });
+
+        var success = controller.TryLoadImageSourceBinding(nodeId, @"C:\images\source.png", out var errorMessage);
+
+        Assert.True(success, errorMessage);
+        Assert.Equal(@"C:\images\source.png", controller.ResolveDisplayText(nodeId, NodeActionIds.PickImageSource));
+    }
+
     private sealed class StubImageLoader : IImageLoader
     {
         private readonly RgbaImage _image;

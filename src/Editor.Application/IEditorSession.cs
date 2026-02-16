@@ -26,6 +26,10 @@ public interface IEditorSession
 
     void SetInputImage(NodeId nodeId, RgbaImage image);
 
+    GraphDocumentState CaptureGraphDocument();
+
+    void LoadGraphDocument(GraphDocumentState document);
+
     bool TryRenderOutput(out RgbaImage? image, out string errorMessage, NodeId? targetNodeId = null);
 
     void RequestPreviewRender(NodeId? targetNodeId = null);

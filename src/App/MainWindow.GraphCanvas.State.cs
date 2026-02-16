@@ -114,6 +114,7 @@ public partial class MainWindow
         UndoButton.IsEnabled = snapshot.CanUndo;
         RedoButton.IsEnabled = snapshot.CanRedo;
         RequestPreviewForActiveSlot();
+        UpdateDocumentDirtyState();
     }
 
     private void RefreshNodeCanvas(IReadOnlyList<Node> nodes, IReadOnlyList<Edge> edges)

@@ -7,6 +7,11 @@ public partial class MainWindow
     protected override void OnClosed(EventArgs e)
     {
         _editorSession.PreviewUpdated -= OnPreviewUpdated;
+        Closing -= OnWindowClosing;
+        NewProjectButton.Click -= OnNewProjectClicked;
+        OpenProjectButton.Click -= OnOpenProjectClicked;
+        SaveProjectButton.Click -= OnSaveProjectClicked;
+        SaveProjectAsButton.Click -= OnSaveProjectAsClicked;
         ExportButton.Click -= OnExportClicked;
         UndoButton.Click -= OnUndoClicked;
         RedoButton.Click -= OnRedoClicked;
@@ -42,7 +47,12 @@ public partial class MainWindow
     private void WireEvents()
     {
         _editorSession.PreviewUpdated += OnPreviewUpdated;
+        Closing += OnWindowClosing;
 
+        NewProjectButton.Click += OnNewProjectClicked;
+        OpenProjectButton.Click += OnOpenProjectClicked;
+        SaveProjectButton.Click += OnSaveProjectClicked;
+        SaveProjectAsButton.Click += OnSaveProjectAsClicked;
         ExportButton.Click += OnExportClicked;
         UndoButton.Click += OnUndoClicked;
         RedoButton.Click += OnRedoClicked;
@@ -73,6 +83,7 @@ public partial class MainWindow
         InitializeViewerViewport();
         BuildNodeToolbarStrip();
         RefreshGraphBindings();
+        InitializeProjectDocumentState();
         SetStatus("Ready");
     }
 

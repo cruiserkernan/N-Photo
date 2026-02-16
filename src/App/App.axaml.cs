@@ -24,7 +24,8 @@ public partial class App : Application
             desktop.MainWindow = new MainWindow(
                 session,
                 new SkiaImageLoader(),
-                new SkiaImageExporter());
+                new SkiaImageExporter(),
+                new JsonProjectDocumentStore());
         }
 
         base.OnFrameworkInitializationCompleted();

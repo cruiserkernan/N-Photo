@@ -42,6 +42,36 @@ public sealed class PreviewRoutingController
         return _previewSlots.ContainsKey(slot);
     }
 
+    public PreviewRoutingState CaptureState()
+    {
+        return new PreviewRoutingState(
+            _previewSlots.ToDictionary(entry => entry.Key, entry => entry.Value),
+            ActiveSlot);
+    }
+
+    public void RestoreState(PreviewRoutingState state)
+    {
+        if (state is null)
+        {
+            throw new ArgumentNullException(nameof(state));
+        }
+
+        _previewSlots.Clear();
+        foreach (var (slot, nodeId) in state.Slots.OrderBy(entry => entry.Key))
+        {
+            if (slot <= 0)
+            {
+                continue;
+            }
+
+            _previewSlots[slot] = nodeId;
+        }
+
+        ActiveSlot = state.ActiveSlot is int activeSlot && _previewSlots.ContainsKey(activeSlot)
+            ? activeSlot
+            : null;
+    }
+
     public void Reset()
     {
         ActiveSlot = null;
@@ -88,3 +118,7 @@ public sealed class PreviewRoutingController
         return key is Key.D0 or Key.NumPad0;
     }
 }
+
+public sealed record PreviewRoutingState(
+    IReadOnlyDictionary<int, NodeId> Slots,
+    int? ActiveSlot);

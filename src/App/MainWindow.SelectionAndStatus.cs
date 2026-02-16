@@ -36,6 +36,7 @@ public partial class MainWindow
         _selectedNodeId = nodeId;
         ApplyNodeSelectionVisuals();
         RefreshPropertiesEditor();
+        OnPersistentStateMutated();
     }
 
     private InputElement? GetFocusedElement()

@@ -78,6 +78,12 @@ public sealed class NodeGraph
         }
     }
 
+    public void Clear()
+    {
+        _nodes.Clear();
+        _edges.Clear();
+    }
+
     public IReadOnlyList<Edge> GetIncomingEdges(NodeId nodeId)
     {
         return _edges.Where(edge => edge.ToNodeId == nodeId).ToArray();

@@ -16,7 +16,7 @@
 - `Editor.Engine`: graph execution, scheduling, caching, command handling.
 - `Editor.Domain`: graph and image domain contracts.
 - `Editor.Imaging`: node kernels for image operations.
-- `Editor.IO`: import/export adapters.
+- `Editor.IO`: image import/export plus project document serialization (`.nphoto`).
 
 ## Core Decisions
 - Runtime image pipeline is half-float (`16-bit float`) in `Editor.Domain.Imaging.RgbaImage`.
@@ -34,6 +34,10 @@
 - Graph and viewer both use shared pan/zoom math via `PanZoomController`.
 - Graph wire geometry math is centralized in `GraphWireGeometryController` (arrowheads, line-grab segments, segment distance, tip offsets).
 - Blend mode handling supports typed `BlendMode` with compatibility parsing for legacy string modes.
+- Session-level graph persistence is explicit through `GraphDocumentState` and `GraphNodeState`, exposed by `IEditorSession` and `IEditorEngine` via capture/load methods.
+- Project documents use versioned JSON (`.nphoto`, `formatVersion = 1`) with deterministic ordering for stable signatures and dirty-state comparison.
+- Project asset bindings are stored as relative paths when they resolve inside project directory boundaries, with absolute fallback for external assets.
+- Dirty tracking compares canonical project signatures rather than mutation counters so undo/redo can clear dirty state when content matches last save.
 
 ## UI Composition
 - `MainWindow` is split into partial files by responsibility:
@@ -55,6 +59,9 @@
   - mask inputs on right edge
 - Graph canvas wire rendering is center-routed and clipped to dynamic node border intersections; connected edges show arrowheads on destination inputs only, while unconnected input/output stubs keep arrowheads for affordance.
 - Viewer panel supports pan/zoom navigation with fit-to-image initialization.
+- Shell file cluster supports `New`, `Open`, `Save`, `Save As`, and `Export`.
+- Unsaved-change prompt flow is integrated for `New`, `Open`, and window close, with `Save`/`Discard`/`Cancel` decisions.
+- Persisted UI state includes node positions, selected node, preview slot assignments, and active preview slot; docking layout and viewport pan/zoom remain out of scope.
 - App visual resources/styles are organized through merged dictionaries under `src/App/Styles/`.
 
 ## Maintenance Rules

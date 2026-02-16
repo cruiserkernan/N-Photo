@@ -13,6 +13,18 @@ public partial class TopToolbarView : UserControl
     public Button ExportButtonControl => this.FindControl<Button>("ExportButton")
                                              ?? throw new InvalidOperationException("ExportButton not found.");
 
+    public Button NewProjectButtonControl => this.FindControl<Button>("NewProjectButton")
+                                                 ?? throw new InvalidOperationException("NewProjectButton not found.");
+
+    public Button OpenProjectButtonControl => this.FindControl<Button>("OpenProjectButton")
+                                                  ?? throw new InvalidOperationException("OpenProjectButton not found.");
+
+    public Button SaveProjectButtonControl => this.FindControl<Button>("SaveProjectButton")
+                                                  ?? throw new InvalidOperationException("SaveProjectButton not found.");
+
+    public Button SaveProjectAsButtonControl => this.FindControl<Button>("SaveProjectAsButton")
+                                                    ?? throw new InvalidOperationException("SaveProjectAsButton not found.");
+
     public Button UndoButtonControl => this.FindControl<Button>("UndoButton")
                                            ?? throw new InvalidOperationException("UndoButton not found.");
 

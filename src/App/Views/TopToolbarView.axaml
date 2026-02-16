@@ -10,6 +10,10 @@
         <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="12">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Classes="toolbar-caption shell-cluster-title" Text="File" />
+                <Button x:Name="NewProjectButton" Classes="toolbar-button" Content="New" />
+                <Button x:Name="OpenProjectButton" Classes="toolbar-button" Content="Open" />
+                <Button x:Name="SaveProjectButton" Classes="toolbar-button" Content="Save" />
+                <Button x:Name="SaveProjectAsButton" Classes="toolbar-button" Content="Save As" />
                 <Button x:Name="ExportButton" Classes="toolbar-button toolbar-button-primary" Content="Export" />
             </StackPanel>
 

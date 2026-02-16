@@ -2,6 +2,14 @@
 
 This repo follows a spec-driven workflow for building a node-based photo editor in C# with Avalonia.
 
+## Engineering Quality (Required)
+- All added or modified code must meet current industry-standard engineering quality.
+- Enforce clean separation of concerns and clear module boundaries; avoid mixing UI, domain, and infrastructure responsibilities.
+- Prefer modern C#/.NET and Avalonia patterns, language features, and architecture practices that are actively maintained and widely adopted.
+- If non-modern or outdated patterns are found in code being touched, remediate them immediately as part of the change when safe and in scope.
+- Default to production-ready code: strong typing, robust error handling, deterministic behavior, test coverage for critical logic, and maintainable structure.
+- Avoid prototype shortcuts in committed code unless explicitly requested by the user.
+
 ## Feature Workflow (Required)
 Use this flow for every feature request:
 1. Plan the feature first.
@@ -46,7 +54,6 @@ For bug fixes, do not use spec-driven files. Fix bugs directly in code.
 - Use automated tests where possible to validate behavior against specs.
 - Include unit tests for core logic and integration tests for end-to-end behavior.
 - Perform manual testing for UI/UX features or complex interactions that are difficult to automate.
-- Run app for a short period after implementation to catch any runtime issues or regressions before marking as implemented. Make sure to quit after a few seconds so that AI does not get stuck infinitely.
 
 ## Spec Rules
 - Keep specs small and testable.
