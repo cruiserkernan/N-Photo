@@ -104,6 +104,7 @@ public partial class MainWindow : Window
         InitializeGraphVisualResources();
         WireEvents();
         InitializeUiState();
+        InitializeAutomation();
     }
 
     private static IEditorSession CreateDefaultSession()

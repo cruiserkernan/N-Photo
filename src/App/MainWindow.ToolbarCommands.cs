@@ -51,6 +51,12 @@ public partial class MainWindow
 
     private async void OnExportClicked(object? sender, RoutedEventArgs e)
     {
+        if (IsAutomationModeEnabled)
+        {
+            SetStatus("Export is disabled in automation mode.");
+            return;
+        }
+
         if (!_editorSession.TryRenderOutput(out var image, out var renderError) || image is null)
         {
             SetStatus($"Render failed: {renderError}");
@@ -168,6 +174,12 @@ public partial class MainWindow
 
     private async Task<string?> PickImagePathAsync(string title)
     {
+        if (IsAutomationModeEnabled)
+        {
+            SetStatus("Image picker is disabled in automation mode.");
+            return null;
+        }
+
         if (StorageProvider is null)
         {
             SetStatus("Storage provider unavailable.");

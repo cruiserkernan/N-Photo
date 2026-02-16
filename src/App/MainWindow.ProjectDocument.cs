@@ -520,6 +520,12 @@ public partial class MainWindow
 
     private async Task<string?> PickProjectOpenPathAsync()
     {
+        if (IsAutomationModeEnabled)
+        {
+            SetStatus("Project open picker is disabled in automation mode.");
+            return null;
+        }
+
         if (StorageProvider is null)
         {
             SetStatus("Storage provider unavailable.");
@@ -558,6 +564,12 @@ public partial class MainWindow
 
     private async Task<string?> PickProjectSavePathAsync()
     {
+        if (IsAutomationModeEnabled)
+        {
+            SetStatus("Project save picker is disabled in automation mode.");
+            return null;
+        }
+
         if (StorageProvider is null)
         {
             SetStatus("Storage provider unavailable.");
@@ -616,6 +628,11 @@ public partial class MainWindow
 
     private async Task<UnsavedChangesDecision> ShowUnsavedChangesDialogAsync(string action)
     {
+        if (IsAutomationModeEnabled)
+        {
+            return UnsavedChangesDecision.Discard;
+        }
+
         var dialog = new Window
         {
             Title = "Unsaved Changes",

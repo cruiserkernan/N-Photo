@@ -1,6 +1,8 @@
 # Build output
 bin/
 obj/
+TestResults/
+artifacts/
 
 # IDE/editor metadata
 .vs/

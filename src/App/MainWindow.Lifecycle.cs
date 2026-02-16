@@ -4,8 +4,15 @@ namespace App;
 
 public partial class MainWindow
 {
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        StartAutomationScenarioIfEnabled();
+    }
+
     protected override void OnClosed(EventArgs e)
     {
+        CancelAutomationScenario();
         _editorSession.PreviewUpdated -= OnPreviewUpdated;
         Closing -= OnWindowClosing;
         NewProjectButton.Click -= OnNewProjectClicked;

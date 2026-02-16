@@ -8,20 +8,29 @@
         d:DesignWidth="1280"
         d:DesignHeight="800"
         x:Class="App.MainWindow"
+        AutomationProperties.AutomationId="MainWindow"
         Title="N-Photo"
         Width="1280"
         Height="800"
         MinWidth="1100"
         MinHeight="700">
     <DockPanel>
-        <views:TopToolbarView x:Name="TopToolbar" DockPanel.Dock="Top" />
+        <views:TopToolbarView x:Name="TopToolbar"
+                              AutomationProperties.AutomationId="TopToolbarRoot"
+                              DockPanel.Dock="Top" />
 
-        <dock:DockControl x:Name="WorkspaceDockControl" />
+        <dock:DockControl x:Name="WorkspaceDockControl"
+                          AutomationProperties.AutomationId="WorkspaceDockControl" />
 
-        <Grid x:Name="PaneSeedGrid" IsVisible="False">
-            <views:GraphPanelView x:Name="GraphPanelRoot" />
-            <views:ViewerPanelView x:Name="ViewerPanelRoot" />
-            <views:PropertiesPanelView x:Name="PropertiesPanelRoot" />
+        <Grid x:Name="PaneSeedGrid"
+              AutomationProperties.AutomationId="PaneSeedGrid"
+              IsVisible="False">
+            <views:GraphPanelView x:Name="GraphPanelRoot"
+                                  AutomationProperties.AutomationId="GraphPanelRoot" />
+            <views:ViewerPanelView x:Name="ViewerPanelRoot"
+                                   AutomationProperties.AutomationId="ViewerPanelRoot" />
+            <views:PropertiesPanelView x:Name="PropertiesPanelRoot"
+                                       AutomationProperties.AutomationId="PropertiesPanelRoot" />
         </Grid>
     </DockPanel>
 </Window>

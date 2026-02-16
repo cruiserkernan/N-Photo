@@ -5,6 +5,7 @@
              mc:Ignorable="d"
              d:DesignWidth="700"
              d:DesignHeight="620"
+             AutomationProperties.AutomationId="ViewerPanelView"
              x:Class="App.Views.ViewerPanelView">
     <Border Classes="panel-surface panel-surface-viewer">
         <Grid RowDefinitions="Auto,*" RowSpacing="8">
@@ -15,12 +16,14 @@
 
             <Border Grid.Row="1" Classes="viewer-surface">
                 <Canvas x:Name="ViewerCanvas"
+                        AutomationProperties.AutomationId="ViewerCanvas"
                         ClipToBounds="True"
                         Focusable="True">
                     <Border x:Name="ViewerLayerClipHost"
                             ClipToBounds="True">
                         <Canvas x:Name="ViewerLayer">
                     <Image x:Name="PreviewImage"
+                                   AutomationProperties.AutomationId="PreviewImage"
                                    Stretch="None" />
                         </Canvas>
                     </Border>

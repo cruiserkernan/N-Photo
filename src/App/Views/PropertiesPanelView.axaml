@@ -5,6 +5,7 @@
              mc:Ignorable="d"
              d:DesignWidth="400"
              d:DesignHeight="620"
+             AutomationProperties.AutomationId="PropertiesPanelView"
              x:Class="App.Views.PropertiesPanelView">
     <Border Classes="panel-surface panel-surface-properties">
         <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
@@ -17,6 +18,7 @@
                 <StackPanel Spacing="2">
                     <TextBlock Classes="section-label" Text="Selected Node" />
                     <TextBlock x:Name="SelectedNodeText"
+                               AutomationProperties.AutomationId="SelectedNodeText"
                                Classes="hint-text"
                                TextWrapping="Wrap"
                                Text="None" />

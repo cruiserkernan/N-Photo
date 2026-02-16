@@ -5,6 +5,7 @@
              mc:Ignorable="d"
              d:DesignWidth="1280"
              d:DesignHeight="86"
+             AutomationProperties.AutomationId="TopToolbarView"
              x:Class="App.Views.TopToolbarView">
     <Border Classes="toolbar-surface shell-toolbar-surface">
         <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="12">
@@ -29,9 +30,13 @@
                 <TextBlock VerticalAlignment="Center" Classes="toolbar-caption shell-cluster-title" Text="Node" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <TextBox x:Name="NodeSearchBox"
+                             AutomationProperties.AutomationId="NodeSearchBox"
                              Width="180"
                              Watermark="Search node type" />
-                    <Button x:Name="NodeSearchAddButton" Content="Add" MinWidth="54" />
+                    <Button x:Name="NodeSearchAddButton"
+                            AutomationProperties.AutomationId="NodeSearchAddButton"
+                            Content="Add"
+                            MinWidth="54" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" x:Name="NodeStripHost" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" />
             </Grid>
@@ -41,6 +46,7 @@
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center">
                 <TextBlock x:Name="StatusTextBlock"
+                           AutomationProperties.AutomationId="StatusText"
                            Classes="status-text"
                            Text="Ready" />
             </Border>

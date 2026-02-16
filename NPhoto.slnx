@@ -11,6 +11,9 @@
     <Project Path="src/Editor.Nodes/Editor.Nodes.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/App.Ui.Desktop.Tests/App.Ui.Desktop.Tests.csproj" />
+    <Project Path="tests/App.Ui.Headless.Tests/App.Ui.Headless.Tests.csproj" />
+    <Project Path="tests/App.Ui.Tests.Common/App.Ui.Tests.Common.csproj" />
     <Project Path="tests/App.Presentation.Tests/App.Presentation.Tests.csproj" />
     <Project Path="tests/Editor.Application.Tests/Editor.Application.Tests.csproj" />
     <Project Path="tests/Editor.Tests.Common/Editor.Tests.Common.csproj" />

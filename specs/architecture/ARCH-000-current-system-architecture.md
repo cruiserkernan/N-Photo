@@ -38,6 +38,9 @@
 - Project documents use versioned JSON (`.nphoto`, `formatVersion = 1`) with deterministic ordering for stable signatures and dirty-state comparison.
 - Project asset bindings are stored as relative paths when they resolve inside project directory boundaries, with absolute fallback for external assets.
 - Dirty tracking compares canonical project signatures rather than mutation counters so undo/redo can clear dirty state when content matches last save.
+- Test-only UI automation is enabled through environment variables (`NPHOTO_AUTOMATION_MODE`, `NPHOTO_AUTOMATION_SCENARIO`, `NPHOTO_AUTOMATION_SCREENSHOT_PATH`) and remains default-off in normal app usage.
+- UI automation supports deterministic startup scenarios (`startup-shell`, `startup-add-transform`) and writes screenshot artifacts to `artifacts/ui-screenshots/`.
+- App shell controls expose stable `AutomationId` selectors for UI automation across headless and desktop test suites.
 
 ## UI Composition
 - `MainWindow` is split into partial files by responsibility:
@@ -63,6 +66,7 @@
 - Unsaved-change prompt flow is integrated for `New`, `Open`, and window close, with `Save`/`Discard`/`Cancel` decisions.
 - Persisted UI state includes node positions, selected node, preview slot assignments, and active preview slot; docking layout and viewport pan/zoom remain out of scope.
 - App visual resources/styles are organized through merged dictionaries under `src/App/Styles/`.
+- Dialog-based picker flows are suppressed during automation mode so tests avoid modal blockers.
 
 ## Maintenance Rules
 - Keep this doc current after each implemented feature or refactor that changes architecture.
@@ -73,3 +77,5 @@
 - `dotnet build`
 - `dotnet test`
 - short app launch smoke test (`dotnet run --project src/App/App.csproj`, then exit)
+- headless UI automation: `dotnet test tests/App.Ui.Headless.Tests/App.Ui.Headless.Tests.csproj -c Debug`
+- desktop UI automation (opt-in): `$env:NPHOTO_ENABLE_DESKTOP_UI_TESTS='1'; dotnet test tests/App.Ui.Desktop.Tests/App.Ui.Desktop.Tests.csproj -c Debug`
