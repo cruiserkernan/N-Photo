@@ -153,6 +153,16 @@ public sealed class BootstrapEditorEngine : IEditorEngine, IDisposable
         }
     }
 
+    public void Disconnect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort)
+    {
+        lock (_sync)
+        {
+            _commandProcessor.Execute(new DisconnectPortsCommand(new Edge(fromNodeId, fromPort, toNodeId, toPort)));
+            Status = $"Disconnected '{fromPort}' -> '{toPort}'";
+            RequestPreviewRenderLocked(null);
+        }
+    }
+
     public void SetParameter(NodeId nodeId, string parameterName, ParameterValue value)
     {
         lock (_sync)

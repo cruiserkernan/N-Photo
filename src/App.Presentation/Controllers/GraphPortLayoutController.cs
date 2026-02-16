@@ -72,6 +72,43 @@ public static class GraphPortLayoutController
         };
     }
 
+    public static Point ResolveNodeCenter(Point nodePosition, double cardWidth, double cardHeight)
+    {
+        return new Point(
+            nodePosition.X + (cardWidth / 2),
+            nodePosition.Y + (cardHeight / 2));
+    }
+
+    public static bool TryResolveBorderIntersection(
+        Point nodeCenter,
+        double cardWidth,
+        double cardHeight,
+        Point towardPoint,
+        out Point borderPoint)
+    {
+        borderPoint = default;
+
+        var dx = towardPoint.X - nodeCenter.X;
+        var dy = towardPoint.Y - nodeCenter.Y;
+        if (Math.Abs(dx) < 0.001 && Math.Abs(dy) < 0.001)
+        {
+            return false;
+        }
+
+        var halfWidth = Math.Max(0.001, cardWidth / 2);
+        var halfHeight = Math.Max(0.001, cardHeight / 2);
+        var scale = Math.Max(Math.Abs(dx) / halfWidth, Math.Abs(dy) / halfHeight);
+        if (scale < 0.001)
+        {
+            return false;
+        }
+
+        borderPoint = new Point(
+            nodeCenter.X + (dx / scale),
+            nodeCenter.Y + (dy / scale));
+        return true;
+    }
+
     private static bool TryResolvePlanForPorts(
         IReadOnlyList<NodePortDefinition> ports,
         string portName,

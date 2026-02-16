@@ -10,23 +10,28 @@
   - top-edge inputs
   - bottom-edge outputs
   - right-edge mask inputs on nodes that expose masking
-- Improve readability of connected and unconnected ports through stronger port state visuals.
+- Treat each connection as center-routed geometry clipped to node borders, with border arrowheads for directional readability.
 
 ## Decisions
 - Node world coordinates remain unconstrained (infinite workspace model from `ARCH-005`).
 - Viewport clipping remains enforced at the graph viewport boundary.
-- Wire anchors are role-based instead of axis-dominance-based:
-  - standard inputs anchor on node top edge
-  - outputs anchor on node bottom edge
-  - mask inputs anchor on node right edge
-- Orthogonal wire routing remains, but final segment direction is determined by target anchor side.
-- Unconnected ports render with a subdued marker style distinct from connected/hovered ports.
+- Wire geometry uses node-center endpoints as canonical routing inputs.
+- Rendered wire segments are clipped to node border intersection points computed from center-to-center direction vectors.
+- Border intersection is data-driven per node card bounds and is not constrained to only top/bottom/right side anchors.
+- For incoming connections, arrowheads are rendered at the destination border and oriented toward the destination center.
+- For connected edges, only destination input/mask endpoints render arrowheads; source output endpoints do not.
+- Unconnected input/mask and output stubs render arrowheads.
+- Connected/unconnected/hover states are communicated by styling only (stroke/opacity/width), not by switching visual types.
+- Existing port roles (standard input, output, mask input) remain valid for connection compatibility and drag semantics.
 - Mask support is modeled as explicit port metadata so placement logic is data-driven per port, not hard-coded per node type in the canvas renderer.
 
 ## UI Interaction Model
-- Users drag connections from output ports to compatible input or mask ports.
+- Users can start a connection drag from either side of an edge:
+  - output -> input/mask creates or retargets a connection
+  - input/mask -> output retargets the incoming source for that input
 - Drag preview wire remains dashed and snaps to nearest compatible target port.
 - Mask ports are visually distinct from standard inputs to reduce accidental connections.
+- Drag preview endpoint follows the pointer while snapped target state remains available for commit.
 
 ## Boundaries
 - `Editor.Domain` owns canonical port definitions (including any new mask-port metadata).
@@ -43,4 +48,4 @@
 ## Validation
 - `dotnet build NPhoto.slnx -c Debug` succeeds.
 - `dotnet test NPhoto.slnx -c Debug --no-build` succeeds.
-- short app smoke run succeeds (`dotnet run --project src/App/App.csproj`, then exit).
+- short app smoke run succeeds (`dotnet run --project src/App/App.csproj -c Debug --no-build`, then exit).

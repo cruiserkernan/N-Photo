@@ -9,6 +9,7 @@
     <Border Classes="panel-surface panel-surface-graph">
         <Border Classes="graph-canvas-shell" Padding="0">
             <Canvas x:Name="NodeCanvas"
+                    Background="Transparent"
                     ClipToBounds="True"
                     Focusable="True" />
         </Border>

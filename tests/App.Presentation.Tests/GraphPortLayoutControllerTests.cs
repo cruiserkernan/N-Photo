@@ -68,4 +68,29 @@ public class GraphPortLayoutControllerTests
         Assert.Equal(new Point(60, 20), topAnchor);
         Assert.Equal(new Point(110, 60), rightAnchor);
     }
+
+    [Fact]
+    public void ResolveNodeCenter_ReturnsCardMidpoint()
+    {
+        var center = GraphPortLayoutController.ResolveNodeCenter(
+            new Point(10, 20),
+            cardWidth: 100,
+            cardHeight: 80);
+
+        Assert.Equal(new Point(60, 60), center);
+    }
+
+    [Fact]
+    public void TryResolveBorderIntersection_UsesDirectionToTowardPoint()
+    {
+        var resolved = GraphPortLayoutController.TryResolveBorderIntersection(
+            nodeCenter: new Point(60, 60),
+            cardWidth: 100,
+            cardHeight: 80,
+            towardPoint: new Point(260, 60),
+            out var borderPoint);
+
+        Assert.True(resolved);
+        Assert.Equal(new Point(110, 60), borderPoint);
+    }
 }

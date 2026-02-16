@@ -53,6 +53,11 @@ public sealed class EditorSession : IEditorSession, IDisposable
         _engine.Connect(fromNodeId, fromPort, toNodeId, toPort);
     }
 
+    public void Disconnect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort)
+    {
+        _engine.Disconnect(fromNodeId, fromPort, toNodeId, toPort);
+    }
+
     public void SetParameter(NodeId nodeId, string parameterName, ParameterValue value)
     {
         _engine.SetParameter(nodeId, parameterName, value);

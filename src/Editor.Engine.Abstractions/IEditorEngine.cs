@@ -26,6 +26,7 @@ public interface IEditorEngine
     NodeId AddNode(string nodeType);
 
     void Connect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort);
+    void Disconnect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort);
 
     void SetParameter(NodeId nodeId, string parameterName, ParameterValue value);
 

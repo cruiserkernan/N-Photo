@@ -5,8 +5,9 @@ using Avalonia.Input;
 using Avalonia.Media;
 using App.Presentation.Controllers;
 using Editor.Domain.Graph;
+using Ellipse = Avalonia.Controls.Shapes.Ellipse;
+using Line = Avalonia.Controls.Shapes.Line;
 using Polygon = Avalonia.Controls.Shapes.Polygon;
-using Polyline = Avalonia.Controls.Shapes.Polyline;
 
 namespace App;
 
@@ -25,9 +26,13 @@ public partial class MainWindow
     private const double PortGlyphPadding = 2;
     private const double PortAnchorEdgePadding = 18;
     private const double PortSnapDistancePixels = 18;
-    private const double WireThickness = 2;
-    private const double WireArrowLength = 9;
-    private const double WireArrowWidth = 5;
+    private const double WireThickness = 3;
+    private const double ArrowHeadHalfWidth = 3.0;
+    private const double ArrowHeadLength = 5.0;
+    private const double ConnectionSnapDotDiameter = 8;
+    private const double PortLineGrabDistance = 12;
+    private const double PortLineGrabLength = 30;
+    private const double ConnectedLineGrabLength = 44;
     private const double ElbowNodeDiameter = 24;
 
     private IBrush _nodeCardBackground = Brushes.Transparent;
@@ -37,15 +42,12 @@ public partial class MainWindow
     private IBrush _nodeCardTitleForeground = Brushes.White;
     private IBrush _nodeCardDetailForeground = Brushes.White;
     private IBrush _wireStroke = Brushes.White;
-    private IBrush _wireArrowFill = Brushes.White;
     private IBrush _portInputConnected = Brushes.White;
     private IBrush _portInputUnconnected = Brushes.White;
     private IBrush _portOutputConnected = Brushes.White;
     private IBrush _portOutputUnconnected = Brushes.White;
     private IBrush _portMaskConnected = Brushes.White;
     private IBrush _portMaskUnconnected = Brushes.White;
-    private IBrush _portBorderConnected = Brushes.White;
-    private IBrush _portBorderUnconnected = Brushes.White;
     private IBrush _portBorderHover = Brushes.White;
 
     private readonly Dictionary<NodeId, Node> _nodeLookup = new();
@@ -60,7 +62,9 @@ public partial class MainWindow
     private NodeId? _activeDragNodeId;
     private NodeId? _selectedNodeId;
     private PortKey? _activeConnectionSource;
+    private Edge? _activeConnectionDetachedEdge;
     private PortKey? _hoverConnectionTarget;
+    private Point? _hoverConnectionTargetAnchor;
     private Point _activeConnectionPointerWorld;
     private bool _isPanningCanvas;
     private bool _isConnectionDragging;
@@ -82,15 +86,12 @@ public partial class MainWindow
         _nodeCardTitleForeground = ResolveBrush("Brush.Text.Primary", "#E5EAF2");
         _nodeCardDetailForeground = ResolveBrush("Brush.Text.Muted", "#95A1B3");
         _wireStroke = ResolveBrush("Brush.Graph.Wire", "#E9BA67");
-        _wireArrowFill = ResolveBrush("Brush.Graph.Wire", "#E9BA67");
         _portInputConnected = ResolveBrush("Brush.PortHandle.Input.Connected", "#E8C47D");
         _portInputUnconnected = ResolveBrush("Brush.PortHandle.Input.Unconnected", "#6D5B34");
         _portOutputConnected = ResolveBrush("Brush.PortHandle.Output.Connected", "#F0C47A");
         _portOutputUnconnected = ResolveBrush("Brush.PortHandle.Output.Unconnected", "#726245");
         _portMaskConnected = ResolveBrush("Brush.PortHandle.Mask.Connected", "#7CB786");
         _portMaskUnconnected = ResolveBrush("Brush.PortHandle.Mask.Unconnected", "#3A6442");
-        _portBorderConnected = ResolveBrush("Brush.PortHandle.Border.Connected", "#F6D08C");
-        _portBorderUnconnected = ResolveBrush("Brush.PortHandle.Border.Unconnected", "#2D333C");
         _portBorderHover = ResolveBrush("Brush.PortHandle.Border.Hover", "#FFF2C8");
     }
 
@@ -159,7 +160,7 @@ public partial class MainWindow
             ResetConnectionDragState();
         }
 
-        RenderWireVisuals(edges);
+        RenderPortVisuals(edges);
         ApplyNodeSelectionVisuals();
     }
 
@@ -263,6 +264,7 @@ public partial class MainWindow
             BorderBrush = _nodeCardBorder,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
+            ClipToBounds = false,
             Cursor = new Cursor(StandardCursorType.SizeAll),
             Child = content
         };
@@ -328,6 +330,7 @@ public partial class MainWindow
             BorderBrush = _nodeCardBorder,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(ElbowNodeDiameter / 2),
+            ClipToBounds = false,
             Cursor = new Cursor(StandardCursorType.SizeAll),
             Child = host
         };
@@ -350,18 +353,12 @@ public partial class MainWindow
         var hitHeight = Math.Max(PortHandleHitSize, glyphGeometry.Height + (PortGlyphPadding * 2));
         var glyphOffsetX = (hitWidth - glyphGeometry.Width) / 2;
         var glyphOffsetY = (hitHeight - glyphGeometry.Height) / 2;
-        var anchorLocalPoint = new Point(
-            glyphOffsetX + glyphGeometry.AnchorPoint.X,
-            glyphOffsetY + glyphGeometry.AnchorPoint.Y);
-
-        var arrow = new Polygon
-        {
-            IsHitTestVisible = false,
-            Points = glyphGeometry.Points,
-            Fill = ResolvePortHandleFill(direction, role, connected: false),
-            Stroke = _portBorderUnconnected,
-            StrokeThickness = 1
-        };
+        var tipLocalPoint = new Point(
+            glyphOffsetX + glyphGeometry.TipPoint.X,
+            glyphOffsetY + glyphGeometry.TipPoint.Y);
+        var edgeLocalPoint = new Point(
+            glyphOffsetX + glyphGeometry.EdgePoint.X,
+            glyphOffsetY + glyphGeometry.EdgePoint.Y);
 
         var handle = new Border
         {
@@ -370,44 +367,35 @@ public partial class MainWindow
             Height = hitHeight,
             Background = Brushes.Transparent,
             Cursor = new Cursor(StandardCursorType.Hand),
-            Child = new Viewbox
-            {
-                Width = glyphGeometry.Width,
-                Height = glyphGeometry.Height,
-                Stretch = Stretch.Fill,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                Child = arrow
-            }
+            ZIndex = 20
         };
         ToolTip.SetTip(handle, role == NodePortRole.Mask ? $"Mask: {portName}" : $"{direction}: {portName}");
         handle.PointerPressed += OnPortHandlePressed;
 
-        _portHandles[key] = new PortHandleVisual(handle, arrow, role, anchorLocalPoint);
+        _portHandles[key] = new PortHandleVisual(handle, role, tipLocalPoint, edgeLocalPoint);
         return handle;
     }
 
     private void OnPortHandlePressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Border handle ||
-            handle.Tag is not PortKey key ||
             !e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed)
         {
             return;
         }
 
-        _activeConnectionSource = key;
-        _hoverConnectionTarget = null;
-        _isConnectionDragging = true;
-
-        if (!TryGetPortAnchor(key, out _activeConnectionPointerWorld))
+        var pointerScreen = e.GetPosition(NodeCanvas);
+        if (!TryFindPortLineGrabTarget(pointerScreen, out var lineTarget))
         {
-            _activeConnectionPointerWorld = ScreenToWorld(e.GetPosition(NodeCanvas));
+            return;
         }
+
+        var dragTarget = ResolveLineGrabTargetWithModifiers(lineTarget, e.KeyModifiers);
+        BeginConnectionDrag(dragTarget.SourcePort, pointerScreen, dragTarget.DetachedEdge);
 
         NodeCanvas.Focus();
         e.Pointer.Capture(NodeCanvas);
-        RenderWireVisuals(_edgeSnapshot);
+        RenderPortVisuals(_edgeSnapshot);
         e.Handled = true;
     }
 
@@ -428,6 +416,18 @@ public partial class MainWindow
 
         if (pointerPoint.Properties.IsLeftButtonPressed && isBackgroundHit)
         {
+            var pointerScreen = e.GetPosition(NodeCanvas);
+            if (TryFindPortLineGrabTarget(pointerScreen, out var lineTarget))
+            {
+                var dragTarget = ResolveLineGrabTargetWithModifiers(lineTarget, e.KeyModifiers);
+                BeginConnectionDrag(dragTarget.SourcePort, pointerScreen, dragTarget.DetachedEdge);
+                NodeCanvas.Focus();
+                e.Pointer.Capture(NodeCanvas);
+                RenderPortVisuals(_edgeSnapshot);
+                e.Handled = true;
+                return;
+            }
+
             _selectedNodeId = null;
             ApplyNodeSelectionVisuals();
             RefreshPropertiesEditor();
@@ -450,10 +450,22 @@ public partial class MainWindow
             return;
         }
 
+        var pointerScreen = e.GetPosition(NodeCanvas);
+        if (TryFindPortLineGrabTarget(pointerScreen, out var lineTarget))
+        {
+            var dragTarget = ResolveLineGrabTargetWithModifiers(lineTarget, e.KeyModifiers);
+            BeginConnectionDrag(dragTarget.SourcePort, pointerScreen, dragTarget.DetachedEdge);
+            NodeCanvas.Focus();
+            e.Pointer.Capture(NodeCanvas);
+            RenderPortVisuals(_edgeSnapshot);
+            e.Handled = true;
+            return;
+        }
+
         SetSelectedNode(nodeId);
         NodeCanvas.Focus();
 
-        var pointerPosition = ScreenToWorld(e.GetPosition(NodeCanvas));
+        var pointerPosition = ScreenToWorld(pointerScreen);
         var currentPosition = GetNodeCardPosition(card);
         _activeDragNodeId = nodeId;
         _activeDragOffset = new Point(
@@ -481,7 +493,7 @@ public partial class MainWindow
 
         _nodePositions[nodeId] = worldPosition;
         SetNodeCardPosition(card, worldPosition);
-        RenderWireVisuals(_edgeSnapshot);
+        RenderPortVisuals(_edgeSnapshot);
         e.Handled = true;
     }
 
@@ -557,7 +569,7 @@ public partial class MainWindow
             SetNodeCardPosition(child, position);
         }
 
-        RenderWireVisuals(_edgeSnapshot);
+        RenderPortVisuals(_edgeSnapshot);
     }
 
     private void OnNodeCanvasPointerMoved(object? sender, PointerEventArgs e)
@@ -566,11 +578,19 @@ public partial class MainWindow
         {
             var pointerScreen = e.GetPosition(NodeCanvas);
             _activeConnectionPointerWorld = ScreenToWorld(pointerScreen);
-            _hoverConnectionTarget = _activeConnectionSource is PortKey source &&
-                                     TryFindNearestCompatiblePort(source, pointerScreen, out var target, out _)
-                ? target
-                : null;
-            RenderWireVisuals(_edgeSnapshot);
+            if (_activeConnectionSource is PortKey source &&
+                TryFindNearestCompatiblePort(source, pointerScreen, out var target, out var targetAnchor))
+            {
+                _hoverConnectionTarget = target;
+                _hoverConnectionTargetAnchor = targetAnchor;
+            }
+            else
+            {
+                _hoverConnectionTarget = null;
+                _hoverConnectionTargetAnchor = null;
+            }
+
+            RenderPortVisuals(_edgeSnapshot);
             e.Handled = true;
             return;
         }
@@ -666,7 +686,7 @@ public partial class MainWindow
         }
     }
 
-    private void RenderWireVisuals(IReadOnlyList<Edge> edges)
+    private void RenderPortVisuals(IReadOnlyList<Edge> edges)
     {
         foreach (var visual in _wireVisuals)
         {
@@ -674,49 +694,197 @@ public partial class MainWindow
         }
 
         _wireVisuals.Clear();
-        UpdatePortHandleVisualStates(edges);
 
-        var insertIndex = 0;
+        var inputToOutput = new Dictionary<PortKey, PortKey>();
+        var connectedOutputs = new HashSet<PortKey>();
         foreach (var edge in edges)
         {
-            var sourceKey = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
-            var targetKey = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
-            if (!TryGetPortAnchor(sourceKey, out var sourceAnchor) ||
-                !TryGetPortAnchor(targetKey, out var targetAnchor))
+            var inputKey = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
+            var outputKey = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
+            inputToOutput[inputKey] = outputKey;
+            connectedOutputs.Add(outputKey);
+        }
+
+        var insertIndex = _graphLayer.Children.Count;
+        var renderDragLine = false;
+        Point dragLineFrom = default, dragLineTo = default;
+
+        foreach (var (key, handle) in _portHandles)
+        {
+            if (!TryGetPortAnchors(key, out var baseAnchor, out var tipAnchor))
             {
                 continue;
             }
 
-            var (wire, arrow) = CreateWire(sourceAnchor, targetAnchor);
-            _graphLayer.Children.Insert(insertIndex++, wire);
-            _graphLayer.Children.Insert(insertIndex++, arrow);
-            _wireVisuals.Add(wire);
-            _wireVisuals.Add(arrow);
+            var isDragSource = _isConnectionDragging &&
+                               _activeConnectionSource is PortKey src && src.Equals(key);
+            var isConnectedOutput = key.Direction == PortDirection.Output && connectedOutputs.Contains(key);
+
+            if (!isDragSource && isConnectedOutput)
+            {
+                continue;
+            }
+
+            Point farEnd;
+            bool isConnected;
+            IBrush stroke;
+            double opacity;
+
+            if (isDragSource)
+            {
+                if (key.Direction == PortDirection.Output)
+                {
+                    if (TryResolveNodeBorderAnchor(key.NodeId, _activeConnectionPointerWorld, out var dynamicSourceAnchor))
+                    {
+                        baseAnchor = dynamicSourceAnchor;
+                        tipAnchor = dynamicSourceAnchor;
+                    }
+
+                    farEnd = tipAnchor;
+                    isConnected = connectedOutputs.Contains(key);
+                    stroke = _portBorderHover;
+                    opacity = 1.0;
+
+                    renderDragLine = true;
+                    dragLineFrom = tipAnchor;
+                    dragLineTo = _activeConnectionPointerWorld;
+                }
+                else
+                {
+                    if (TryResolveNodeBorderAnchor(key.NodeId, _activeConnectionPointerWorld, out var dynamicInputAnchor))
+                    {
+                        baseAnchor = dynamicInputAnchor;
+                    }
+
+                    farEnd = _activeConnectionPointerWorld;
+                    isConnected = false;
+                    stroke = _portBorderHover;
+                    opacity = 1.0;
+                }
+            }
+            else if (key.Direction != PortDirection.Output &&
+                     inputToOutput.TryGetValue(key, out var sourceOutputKey))
+            {
+                isConnected = true;
+                stroke = _wireStroke;
+                opacity = 1.0;
+
+                if (TryGetNodeCenter(sourceOutputKey.NodeId, out var sourceCenter) &&
+                    TryGetNodeCenter(key.NodeId, out var targetCenter) &&
+                    TryResolveNodeBorderAnchor(sourceOutputKey.NodeId, targetCenter, out var sourceBorderAnchor) &&
+                    TryResolveNodeBorderAnchor(key.NodeId, sourceCenter, out var targetBorderAnchor))
+                {
+                    farEnd = sourceBorderAnchor;
+                    baseAnchor = targetBorderAnchor;
+                }
+                else
+                {
+                    farEnd = TryGetPortAnchor(sourceOutputKey, out var outputTip)
+                        ? outputTip
+                        : tipAnchor;
+                }
+            }
+            else
+            {
+                farEnd = tipAnchor;
+                isConnected = isConnectedOutput;
+                stroke = ResolvePortHandleStroke(key.Direction, handle.Role, isConnected);
+                opacity = isConnected ? 1.0 : 0.75;
+            }
+
+            if (!isDragSource &&
+                _hoverConnectionTarget is PortKey hover && hover.Equals(key))
+            {
+                stroke = _portBorderHover;
+                opacity = 1.0;
+            }
+
+            var line = new Line
+            {
+                IsHitTestVisible = false,
+                StartPoint = farEnd,
+                EndPoint = baseAnchor,
+                Stroke = stroke,
+                StrokeThickness = WireThickness,
+                StrokeLineCap = PenLineCap.Round,
+                Opacity = opacity
+            };
+            _graphLayer.Children.Insert(insertIndex++, line);
+            _wireVisuals.Add(line);
+
+            var drawArrow = false;
+            Point arrowTip = default;
+            Point arrowFrom = default;
+
+            if (key.Direction == PortDirection.Output)
+            {
+                if (!isConnected)
+                {
+                    drawArrow = true;
+                    arrowTip = farEnd;
+                    arrowFrom = baseAnchor;
+                }
+            }
+            else
+            {
+                drawArrow = true;
+                arrowTip = baseAnchor;
+                arrowFrom = farEnd;
+            }
+
+            if (drawArrow)
+            {
+                var arrowPoints = ComputeArrowhead(arrowTip, arrowFrom);
+                if (arrowPoints.Count > 0)
+                {
+                    var arrow = new Polygon
+                    {
+                        IsHitTestVisible = false,
+                        Points = arrowPoints,
+                        Fill = stroke,
+                        Opacity = opacity
+                    };
+                    _graphLayer.Children.Insert(insertIndex++, arrow);
+                    _wireVisuals.Add(arrow);
+                }
+            }
         }
 
-        if (_isConnectionDragging &&
-            TryResolveDragWireEndpoints(out var dragSourceAnchor, out var dragTargetAnchor))
+        if (renderDragLine)
         {
-            var (dragWire, dragArrow) = CreateWire(dragSourceAnchor, dragTargetAnchor);
-            dragWire.StrokeDashArray = new AvaloniaList<double> { 5, 4 };
-            _graphLayer.Children.Insert(insertIndex++, dragWire);
-            _graphLayer.Children.Insert(insertIndex++, dragArrow);
-            _wireVisuals.Add(dragWire);
-            _wireVisuals.Add(dragArrow);
+            var dragLine = new Line
+            {
+                IsHitTestVisible = false,
+                StartPoint = dragLineFrom,
+                EndPoint = dragLineTo,
+                Stroke = _wireStroke,
+                StrokeThickness = WireThickness,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeDashArray = new AvaloniaList<double> { 5, 4 }
+            };
+            _graphLayer.Children.Insert(insertIndex, dragLine);
+            _wireVisuals.Add(dragLine);
+            insertIndex++;
         }
-    }
 
-    private (Polyline Wire, Polygon Arrow) CreateWire(Point sourceAnchor, Point targetAnchor)
-    {
-        var wire = new Polyline
+        if (_isConnectionDragging && _hoverConnectionTargetAnchor is Point snapAnchor)
         {
-            IsHitTestVisible = false,
-            Stroke = _wireStroke,
-            StrokeThickness = WireThickness,
-            Points = new[] { sourceAnchor, targetAnchor }
-        };
-        var arrow = (Polygon)CreateArrowHead(sourceAnchor, targetAnchor);
-        return (wire, arrow);
+            var radius = ConnectionSnapDotDiameter / 2;
+            var snapDot = new Ellipse
+            {
+                IsHitTestVisible = false,
+                Width = ConnectionSnapDotDiameter,
+                Height = ConnectionSnapDotDiameter,
+                Fill = _portBorderHover,
+                Stroke = _wireStroke,
+                StrokeThickness = 1.25,
+                ZIndex = 30
+            };
+            Canvas.SetLeft(snapDot, snapAnchor.X - radius);
+            Canvas.SetTop(snapDot, snapAnchor.Y - radius);
+            _graphLayer.Children.Insert(insertIndex, snapDot);
+            _wireVisuals.Add(snapDot);
+        }
     }
 
     private bool TryCommitDraggedConnection(Point pointerScreen)
@@ -733,15 +901,51 @@ public partial class MainWindow
         }
 
         var (fromPort, toPort) = ResolveConnectionOrder(source, target);
+        var newEdge = new Edge(fromPort.NodeId, fromPort.PortName, toPort.NodeId, toPort.PortName);
+
+        if (_activeConnectionDetachedEdge is Edge detachedEdge &&
+            detachedEdge.Equals(newEdge))
+        {
+            SetStatus("Connection unchanged.");
+            return true;
+        }
+
         try
         {
-            _editorSession.Connect(fromPort.NodeId, fromPort.PortName, toPort.NodeId, toPort.PortName);
+            if (_activeConnectionDetachedEdge is Edge edgeToDetach)
+            {
+                _editorSession.Disconnect(
+                    edgeToDetach.FromNodeId,
+                    edgeToDetach.FromPort,
+                    edgeToDetach.ToNodeId,
+                    edgeToDetach.ToPort);
+            }
+
+            _editorSession.Connect(newEdge.FromNodeId, newEdge.FromPort, newEdge.ToNodeId, newEdge.ToPort);
             RefreshGraphBindings();
             SetStatus($"Connected {fromPort.PortName} -> {toPort.PortName}");
             return true;
         }
         catch (Exception exception)
         {
+            if (_activeConnectionDetachedEdge is Edge edgeToRestore)
+            {
+                try
+                {
+                    _editorSession.Connect(
+                        edgeToRestore.FromNodeId,
+                        edgeToRestore.FromPort,
+                        edgeToRestore.ToNodeId,
+                        edgeToRestore.ToPort);
+                    RefreshGraphBindings();
+                }
+                catch
+                {
+                    // If rollback fails, keep original connect error but refresh view from latest snapshot.
+                    RefreshGraphBindings();
+                }
+            }
+
             SetStatus($"Connect failed: {exception.Message}");
             return false;
         }
@@ -751,8 +955,27 @@ public partial class MainWindow
     {
         _isConnectionDragging = false;
         _activeConnectionSource = null;
+        _activeConnectionDetachedEdge = null;
         _hoverConnectionTarget = null;
-        RenderWireVisuals(_edgeSnapshot);
+        _hoverConnectionTargetAnchor = null;
+        RenderPortVisuals(_edgeSnapshot);
+    }
+
+    private void BeginConnectionDrag(PortKey sourcePort, Point pointerScreen, Edge? detachedEdge = null)
+    {
+        _activeConnectionSource = sourcePort;
+        _activeConnectionDetachedEdge = detachedEdge;
+        if (_activeConnectionDetachedEdge is null &&
+            sourcePort.Direction == PortDirection.Output &&
+            TryResolveOutputDetachEdgeForDrag(sourcePort, pointerScreen, out var existingEdge))
+        {
+            _activeConnectionDetachedEdge = existingEdge;
+        }
+
+        _hoverConnectionTarget = null;
+        _hoverConnectionTargetAnchor = null;
+        _isConnectionDragging = true;
+        _activeConnectionPointerWorld = ScreenToWorld(pointerScreen);
     }
 
     private bool TryFindNearestCompatiblePort(
@@ -765,6 +988,7 @@ public partial class MainWindow
         targetAnchor = default;
         var found = false;
         var nearestDistance = double.MaxValue;
+        var pointerWorld = ScreenToWorld(pointerScreen);
         var targetDirection = sourcePort.Direction == PortDirection.Output
             ? PortDirection.Input
             : PortDirection.Output;
@@ -778,7 +1002,8 @@ public partial class MainWindow
             foreach (var candidatePortName in candidatePortNames)
             {
                 var candidate = new PortKey(node.Id, candidatePortName, targetDirection);
-                if (!TryGetPortAnchor(candidate, out var anchor))
+                var hasDynamicAnchor = TryResolveNodeBorderAnchor(candidate.NodeId, pointerWorld, out var anchor);
+                if (!hasDynamicAnchor && !TryGetPortAnchor(candidate, out anchor))
                 {
                     continue;
                 }
@@ -802,52 +1027,177 @@ public partial class MainWindow
         return found;
     }
 
+    private bool TryFindPortLineGrabTarget(Point pointerScreen, out PortLineGrabTarget target)
+    {
+        target = default;
+        var nearestDistance = double.MaxValue;
+        var found = false;
+
+        var connectedInputs = new HashSet<PortKey>();
+        var connectedOutputs = new HashSet<PortKey>();
+        foreach (var edge in _edgeSnapshot)
+        {
+            var inputKey = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
+            var outputKey = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
+            connectedInputs.Add(inputKey);
+            connectedOutputs.Add(outputKey);
+
+            if (!TryResolveConnectedLineAnchors(outputKey, inputKey, out var outputAnchor, out var inputAnchor))
+            {
+                continue;
+            }
+
+            var outputAnchorScreen = WorldToScreen(outputAnchor);
+            var inputAnchorScreen = WorldToScreen(inputAnchor);
+            if (TryResolveLineGrabSegment(outputAnchorScreen, inputAnchorScreen, ConnectedLineGrabLength, out var outputGrabStart, out var outputGrabEnd))
+            {
+                var outputDistance = ComputeDistanceToSegment(pointerScreen, outputGrabStart, outputGrabEnd);
+                if (outputDistance <= PortLineGrabDistance && outputDistance < nearestDistance)
+                {
+                    nearestDistance = outputDistance;
+                    target = new PortLineGrabTarget(inputKey, edge);
+                    found = true;
+                }
+            }
+
+            if (TryResolveLineGrabSegment(inputAnchorScreen, outputAnchorScreen, ConnectedLineGrabLength, out var inputGrabStart, out var inputGrabEnd))
+            {
+                var inputDistance = ComputeDistanceToSegment(pointerScreen, inputGrabStart, inputGrabEnd);
+                if (inputDistance <= PortLineGrabDistance && inputDistance < nearestDistance)
+                {
+                    nearestDistance = inputDistance;
+                    target = new PortLineGrabTarget(outputKey, edge);
+                    found = true;
+                }
+            }
+        }
+
+        foreach (var (candidatePort, _) in _portHandles)
+        {
+            var isConnected = candidatePort.Direction == PortDirection.Output
+                ? connectedOutputs.Contains(candidatePort)
+                : connectedInputs.Contains(candidatePort);
+            if (isConnected)
+            {
+                continue;
+            }
+
+            if (!TryGetPortAnchors(candidatePort, out var baseAnchor, out var tipAnchor))
+            {
+                continue;
+            }
+
+            var baseAnchorScreen = WorldToScreen(baseAnchor);
+            var tipAnchorScreen = WorldToScreen(tipAnchor);
+            if (!TryResolveLineGrabSegment(baseAnchorScreen, tipAnchorScreen, PortLineGrabLength, out var grabStart, out var grabEnd))
+            {
+                continue;
+            }
+
+            var distance = ComputeDistanceToSegment(pointerScreen, grabStart, grabEnd);
+            if (distance <= PortLineGrabDistance && distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                target = new PortLineGrabTarget(candidatePort, null);
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    private bool TryResolveConnectedLineAnchors(
+        PortKey outputPort,
+        PortKey inputPort,
+        out Point outputAnchor,
+        out Point inputAnchor)
+    {
+        outputAnchor = default;
+        inputAnchor = default;
+        if (TryGetNodeCenter(outputPort.NodeId, out var sourceCenter) &&
+            TryGetNodeCenter(inputPort.NodeId, out var targetCenter) &&
+            TryResolveNodeBorderAnchor(outputPort.NodeId, targetCenter, out var sourceBorderAnchor) &&
+            TryResolveNodeBorderAnchor(inputPort.NodeId, sourceCenter, out var targetBorderAnchor))
+        {
+            outputAnchor = sourceBorderAnchor;
+            inputAnchor = targetBorderAnchor;
+            return true;
+        }
+
+        return TryGetPortAnchor(outputPort, out outputAnchor) &&
+               TryGetPortAnchor(inputPort, out inputAnchor);
+    }
+
+    private static PortLineGrabTarget ResolveLineGrabTargetWithModifiers(
+        PortLineGrabTarget target,
+        KeyModifiers modifiers)
+    {
+        if (target.DetachedEdge is not Edge edge ||
+            (modifiers & KeyModifiers.Control) == 0)
+        {
+            return target;
+        }
+
+        var invertedSource = target.SourcePort.Direction == PortDirection.Output
+            ? new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input)
+            : new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
+        return new PortLineGrabTarget(invertedSource, edge);
+    }
+
+    private bool TryResolveOutputDetachEdgeForDrag(PortKey outputPort, Point pointerScreen, out Edge detachedEdge)
+    {
+        detachedEdge = default!;
+        if (outputPort.Direction != PortDirection.Output)
+        {
+            return false;
+        }
+
+        var candidates = _edgeSnapshot
+            .Where(edge => edge.FromNodeId == outputPort.NodeId &&
+                           string.Equals(edge.FromPort, outputPort.PortName, StringComparison.Ordinal))
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            return false;
+        }
+
+        if (candidates.Length == 1)
+        {
+            detachedEdge = candidates[0];
+            return true;
+        }
+
+        var nearestDistance = double.MaxValue;
+        Edge? bestEdge = null;
+        foreach (var candidate in candidates)
+        {
+            var inputPort = new PortKey(candidate.ToNodeId, candidate.ToPort, PortDirection.Input);
+            if (!TryResolveConnectedLineAnchors(outputPort, inputPort, out var outputAnchor, out var inputAnchor))
+            {
+                continue;
+            }
+
+            var outputAnchorScreen = WorldToScreen(outputAnchor);
+            var inputAnchorScreen = WorldToScreen(inputAnchor);
+            var distance = ComputeDistanceToSegment(pointerScreen, outputAnchorScreen, inputAnchorScreen);
+            if (distance >= nearestDistance)
+            {
+                continue;
+            }
+
+            nearestDistance = distance;
+            bestEdge = candidate;
+        }
+
+        detachedEdge = bestEdge ?? candidates[0];
+        return true;
+    }
+
     private static (PortKey FromPort, PortKey ToPort) ResolveConnectionOrder(PortKey first, PortKey second)
     {
         return first.Direction == PortDirection.Output
             ? (first, second)
             : (second, first);
-    }
-
-    private bool TryResolveDragWireEndpoints(
-        out Point dragSourceAnchor,
-        out Point dragTargetAnchor)
-    {
-        dragSourceAnchor = default;
-        dragTargetAnchor = default;
-
-        if (_activeConnectionSource is not PortKey source ||
-            !TryGetPortAnchor(source, out var sourceAnchor))
-        {
-            return false;
-        }
-
-        if (source.Direction == PortDirection.Output)
-        {
-            dragSourceAnchor = sourceAnchor;
-            if (_hoverConnectionTarget is PortKey hoverTarget &&
-                TryGetPortAnchor(hoverTarget, out var hoverAnchor))
-            {
-                dragTargetAnchor = hoverAnchor;
-                return true;
-            }
-
-            dragTargetAnchor = _activeConnectionPointerWorld;
-            return true;
-        }
-
-        dragTargetAnchor = sourceAnchor;
-        if (_hoverConnectionTarget is PortKey hoverOutput &&
-            TryGetPortAnchor(hoverOutput, out var hoverOutputAnchor))
-        {
-            dragSourceAnchor = hoverOutputAnchor;
-        }
-        else
-        {
-            dragSourceAnchor = _activeConnectionPointerWorld;
-        }
-
-        return true;
     }
 
     private bool TryGetPortAnchor(PortKey key, out Point anchor)
@@ -856,7 +1206,7 @@ public partial class MainWindow
 
         if (_portHandles.TryGetValue(key, out var visual))
         {
-            if (visual.Glyph.IsVisible && TryResolveVisualAnchor(visual, out anchor))
+            if (TryResolveVisualAnchorPoint(visual, visual.TipLocalPoint, out anchor))
             {
                 return true;
             }
@@ -880,16 +1230,90 @@ public partial class MainWindow
 
         var cardHeight = GetCardHeight(key.NodeId);
         var cardWidth = GetCardWidth(key.NodeId);
-        anchor = GraphPortLayoutController.ResolveAnchor(
+        var edgeAnchor = GraphPortLayoutController.ResolveAnchor(
             nodePosition,
             cardWidth,
             cardHeight,
             anchorPlan,
             PortAnchorEdgePadding);
+        anchor = edgeAnchor + ResolvePortTipOffset(anchorPlan.Side, key.Direction);
         return true;
     }
 
-    private bool TryResolveVisualAnchor(PortHandleVisual visual, out Point anchor)
+    private bool TryGetPortAnchors(PortKey key, out Point baseAnchor, out Point tipAnchor)
+    {
+        baseAnchor = default;
+        tipAnchor = default;
+
+        if (_portHandles.TryGetValue(key, out var visual))
+        {
+            if (TryResolveVisualAnchorPoint(visual, visual.EdgeLocalPoint, out baseAnchor) &&
+                TryResolveVisualAnchorPoint(visual, visual.TipLocalPoint, out tipAnchor))
+            {
+                return true;
+            }
+        }
+
+        if (!_nodeLookup.TryGetValue(key.NodeId, out var node) ||
+            !_nodePositions.TryGetValue(key.NodeId, out var nodePosition))
+        {
+            return false;
+        }
+
+        var nodeType = _editorSession.GetNodeTypeDefinition(node.Type);
+        if (!GraphPortLayoutController.TryResolveAnchorPlan(
+                nodeType,
+                key.PortName,
+                key.Direction,
+                out var anchorPlan))
+        {
+            return false;
+        }
+
+        var cardHeight = GetCardHeight(key.NodeId);
+        var cardWidth = GetCardWidth(key.NodeId);
+        baseAnchor = GraphPortLayoutController.ResolveAnchor(
+            nodePosition,
+            cardWidth,
+            cardHeight,
+            anchorPlan,
+            PortAnchorEdgePadding);
+        tipAnchor = baseAnchor + ResolvePortTipOffset(anchorPlan.Side, key.Direction);
+        return true;
+    }
+
+    private bool TryGetNodeCenter(NodeId nodeId, out Point center)
+    {
+        center = default;
+        if (!_nodePositions.TryGetValue(nodeId, out var nodePosition))
+        {
+            return false;
+        }
+
+        center = GraphPortLayoutController.ResolveNodeCenter(
+            nodePosition,
+            GetCardWidth(nodeId),
+            GetCardHeight(nodeId));
+        return true;
+    }
+
+    private bool TryResolveNodeBorderAnchor(NodeId nodeId, Point towardPoint, out Point borderAnchor)
+    {
+        borderAnchor = default;
+        if (!TryGetNodeCenter(nodeId, out var nodeCenter))
+        {
+            return false;
+        }
+
+        return GraphPortLayoutController.TryResolveBorderIntersection(
+            nodeCenter,
+            GetCardWidth(nodeId),
+            GetCardHeight(nodeId),
+            towardPoint,
+            out borderAnchor);
+    }
+
+    private bool TryResolveVisualAnchorPoint(PortHandleVisual visual, Point localPoint, out Point anchor)
     {
         var width = visual.HitArea.Bounds.Width;
         var height = visual.HitArea.Bounds.Height;
@@ -899,7 +1323,7 @@ public partial class MainWindow
             return false;
         }
 
-        var translated = visual.HitArea.TranslatePoint(visual.AnchorLocalPoint, _graphLayer);
+        var translated = visual.HitArea.TranslatePoint(localPoint, _graphLayer);
         if (translated.HasValue)
         {
             anchor = translated.Value;
@@ -910,40 +1334,7 @@ public partial class MainWindow
         return false;
     }
 
-    private void UpdatePortHandleVisualStates(IReadOnlyList<Edge> edges)
-    {
-        var connectedInputs = edges
-            .Select(edge => new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input))
-            .ToHashSet();
-        var connectedOutputs = edges
-            .Select(edge => new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output))
-            .ToHashSet();
-
-        foreach (var (key, handle) in _portHandles)
-        {
-            var isConnected = key.Direction == PortDirection.Output
-                ? connectedOutputs.Contains(key)
-                : connectedInputs.Contains(key);
-            var role = handle.Role;
-            var showGlyph = !isConnected;
-
-            handle.Glyph.IsVisible = showGlyph;
-
-            handle.Glyph.Fill = ResolvePortHandleFill(key.Direction, role, isConnected);
-            handle.Glyph.Stroke = isConnected ? _portBorderConnected : _portBorderUnconnected;
-            handle.Glyph.StrokeThickness = 1;
-
-            if (showGlyph &&
-                ((_hoverConnectionTarget is PortKey hover && hover.Equals(key)) ||
-                 (_activeConnectionSource is PortKey active && active.Equals(key))))
-            {
-                handle.Glyph.Stroke = _portBorderHover;
-                handle.Glyph.StrokeThickness = 1.5;
-            }
-        }
-    }
-
-    private IBrush ResolvePortHandleFill(PortDirection direction, NodePortRole role, bool connected)
+    private IBrush ResolvePortHandleStroke(PortDirection direction, NodePortRole role, bool connected)
     {
         if (direction == PortDirection.Output)
         {
@@ -986,125 +1377,119 @@ public partial class MainWindow
                 ? new PortGlyphGeometry(
                     Width: 18,
                     Height: 10,
-                    AnchorPoint: new Point(1, 5),
-                    Points: new[]
-                    {
-                        new Point(1, 5),
-                        new Point(7, 1),
-                        new Point(7, 3.5),
-                        new Point(17, 3.5),
-                        new Point(17, 6.5),
-                        new Point(7, 6.5),
-                        new Point(7, 9)
-                    })
+                    EdgePoint: new Point(1, 5),
+                    TipPoint: new Point(17, 5))
                 : new PortGlyphGeometry(
-                    Width: 18,
+                    Width: 12,
                     Height: 10,
-                    AnchorPoint: new Point(1, 5),
-                    Points: new[]
-                    {
-                        new Point(17, 5),
-                        new Point(11, 1),
-                        new Point(11, 3.5),
-                        new Point(1, 3.5),
-                        new Point(1, 6.5),
-                        new Point(11, 6.5),
-                        new Point(11, 9)
-                    }),
+                    EdgePoint: new Point(1, 5),
+                    TipPoint: new Point(11, 5)),
             GraphPortSide.Bottom => direction == PortDirection.Output
                 ? new PortGlyphGeometry(
                     Width: 10,
-                    Height: 18,
-                    AnchorPoint: new Point(5, 1),
-                    Points: new[]
-                    {
-                        new Point(5, 17),
-                        new Point(1, 11),
-                        new Point(3.5, 11),
-                        new Point(3.5, 1),
-                        new Point(6.5, 1),
-                        new Point(6.5, 11),
-                        new Point(9, 11)
-                    })
+                    Height: 12,
+                    EdgePoint: new Point(5, 1),
+                    TipPoint: new Point(5, 11))
                 : new PortGlyphGeometry(
                     Width: 10,
                     Height: 18,
-                    AnchorPoint: new Point(5, 1),
-                    Points: new[]
-                    {
-                        new Point(5, 1),
-                        new Point(1, 7),
-                        new Point(3.5, 7),
-                        new Point(3.5, 17),
-                        new Point(6.5, 17),
-                        new Point(6.5, 7),
-                        new Point(9, 7)
-                    }),
+                    EdgePoint: new Point(5, 1),
+                    TipPoint: new Point(5, 17)),
             _ => direction == PortDirection.Input
                 ? new PortGlyphGeometry(
                     Width: 10,
                     Height: 18,
-                    AnchorPoint: new Point(5, 17),
-                    Points: new[]
-                    {
-                        new Point(5, 17),
-                        new Point(1, 11),
-                        new Point(3.5, 11),
-                        new Point(3.5, 1),
-                        new Point(6.5, 1),
-                        new Point(6.5, 11),
-                        new Point(9, 11)
-                    })
+                    EdgePoint: new Point(5, 17),
+                    TipPoint: new Point(5, 1))
                 : new PortGlyphGeometry(
                     Width: 10,
                     Height: 18,
-                    AnchorPoint: new Point(5, 17),
-                    Points: new[]
-                    {
-                        new Point(5, 1),
-                        new Point(1, 7),
-                        new Point(3.5, 7),
-                        new Point(3.5, 17),
-                        new Point(6.5, 17),
-                        new Point(6.5, 7),
-                        new Point(9, 7)
-                    })
+                    EdgePoint: new Point(5, 17),
+                    TipPoint: new Point(5, 7))
         };
     }
 
-    private Control CreateArrowHead(Point from, Point to)
+    private static IList<Point> ComputeArrowhead(Point tip, Point from)
     {
-        var deltaX = to.X - from.X;
-        var deltaY = to.Y - from.Y;
-        var length = Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
+        var dx = tip.X - from.X;
+        var dy = tip.Y - from.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
         if (length < 0.001)
         {
-            return new Polygon
-            {
-                IsHitTestVisible = false,
-                Fill = _wireArrowFill,
-                Points = new[] { to, to, to }
-            };
+            return Array.Empty<Point>();
         }
 
-        var direction = new Point(deltaX / length, deltaY / length);
-        var perpendicular = new Point(-direction.Y, direction.X);
-        var basePoint = new Point(
-            to.X - (direction.X * WireArrowLength),
-            to.Y - (direction.Y * WireArrowLength));
-        var left = new Point(
-            basePoint.X + (perpendicular.X * WireArrowWidth),
-            basePoint.Y + (perpendicular.Y * WireArrowWidth));
-        var right = new Point(
-            basePoint.X - (perpendicular.X * WireArrowWidth),
-            basePoint.Y - (perpendicular.Y * WireArrowWidth));
+        var nx = dx / length;
+        var ny = dy / length;
+        var px = -ny;
+        var py = nx;
 
-        return new Polygon
+        var baseCenterX = tip.X - nx * ArrowHeadLength;
+        var baseCenterY = tip.Y - ny * ArrowHeadLength;
+
+        return new[]
         {
-            IsHitTestVisible = false,
-            Fill = _wireArrowFill,
-            Points = new[] { to, left, right }
+            tip,
+            new Point(baseCenterX + px * ArrowHeadHalfWidth, baseCenterY + py * ArrowHeadHalfWidth),
+            new Point(baseCenterX - px * ArrowHeadHalfWidth, baseCenterY - py * ArrowHeadHalfWidth)
         };
+    }
+
+    private static bool TryResolveLineGrabSegment(
+        Point nodeBorderAnchor,
+        Point lineFarEnd,
+        double maxGrabLength,
+        out Point grabStart,
+        out Point grabEnd)
+    {
+        grabStart = default;
+        grabEnd = default;
+
+        var dx = lineFarEnd.X - nodeBorderAnchor.X;
+        var dy = lineFarEnd.Y - nodeBorderAnchor.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        if (length < 0.001)
+        {
+            return false;
+        }
+
+        var segmentLength = Math.Min(length, maxGrabLength);
+        var scale = segmentLength / length;
+        grabStart = nodeBorderAnchor;
+        grabEnd = new Point(
+            nodeBorderAnchor.X + dx * scale,
+            nodeBorderAnchor.Y + dy * scale);
+        return true;
+    }
+
+    private static double ComputeDistanceToSegment(Point point, Point segmentStart, Point segmentEnd)
+    {
+        var dx = segmentEnd.X - segmentStart.X;
+        var dy = segmentEnd.Y - segmentStart.Y;
+        var lengthSquared = dx * dx + dy * dy;
+        if (lengthSquared < 0.0001)
+        {
+            return Math.Sqrt(
+                ((point.X - segmentStart.X) * (point.X - segmentStart.X)) +
+                ((point.Y - segmentStart.Y) * (point.Y - segmentStart.Y)));
+        }
+
+        var projection = ((point.X - segmentStart.X) * dx + (point.Y - segmentStart.Y) * dy) / lengthSquared;
+        projection = Math.Clamp(projection, 0.0, 1.0);
+
+        var nearestX = segmentStart.X + dx * projection;
+        var nearestY = segmentStart.Y + dy * projection;
+        var deltaX = point.X - nearestX;
+        var deltaY = point.Y - nearestY;
+        return Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+    }
+
+    private static Vector ResolvePortTipOffset(GraphPortSide side, PortDirection direction)
+    {
+        var geometry = ResolvePortGlyphGeometry(side, direction);
+        return new Vector(
+            geometry.TipPoint.X - geometry.EdgePoint.X,
+            geometry.TipPoint.Y - geometry.EdgePoint.Y);
     }
 
     private double GetCardHeight(NodeId nodeId)
@@ -1214,16 +1599,17 @@ public partial class MainWindow
     }
 
     private readonly record struct PortKey(NodeId NodeId, string PortName, PortDirection Direction);
+    private readonly record struct PortLineGrabTarget(PortKey SourcePort, Edge? DetachedEdge);
 
     private sealed record PortGlyphGeometry(
         double Width,
         double Height,
-        Point AnchorPoint,
-        IList<Point> Points);
+        Point EdgePoint,
+        Point TipPoint);
 
     private sealed record PortHandleVisual(
         Border HitArea,
-        Polygon Glyph,
         NodePortRole Role,
-        Point AnchorLocalPoint);
+        Point TipLocalPoint,
+        Point EdgeLocalPoint);
 }

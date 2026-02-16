@@ -43,6 +43,7 @@
   - standard inputs on top edge
   - outputs on bottom edge
   - mask inputs on right edge
+- Graph canvas wire rendering is center-routed and clipped to dynamic node border intersections; connected edges show arrowheads on destination inputs only, while unconnected input/output stubs keep arrowheads for affordance.
 - Viewer panel supports pan/zoom navigation with fit-to-image initialization.
 
 ## Maintenance Rules

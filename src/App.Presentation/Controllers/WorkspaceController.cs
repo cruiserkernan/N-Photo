@@ -26,6 +26,11 @@ public sealed class WorkspaceController
         _session.Connect(fromNodeId, fromPort, toNodeId, toPort);
     }
 
+    public void Disconnect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort)
+    {
+        _session.Disconnect(fromNodeId, fromPort, toNodeId, toPort);
+    }
+
     public void SetParameter(NodeId nodeId, string parameterName, ParameterValue value)
     {
         _session.SetParameter(nodeId, parameterName, value);

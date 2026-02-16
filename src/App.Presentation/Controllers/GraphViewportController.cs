@@ -31,6 +31,8 @@ public static class GraphViewportController
 
     public static void ApplyGraphTransform(Canvas graphLayer, double zoomScale, Vector panOffset)
     {
+        graphLayer.RenderTransformOrigin = RelativePoint.TopLeft;
+
         var transforms = new Transforms
         {
             new ScaleTransform(zoomScale, zoomScale),
