@@ -61,6 +61,13 @@
   - outputs on bottom edge
   - mask inputs on right edge
 - Graph canvas wire rendering is center-routed and clipped to dynamic node border intersections; connected edges show arrowheads on destination inputs only, while unconnected input/output stubs keep arrowheads for affordance.
+- Graph canvas connection drop targeting resolves by precise port snap first, then node-body fallback targeting (full node body + padding) with default compatible ports.
+- Graph canvas node-body interaction takes precedence over edge/stub grabs; inside-node pointer-down always initiates node drag.
+- Graph canvas supports wire splice workflows:
+  - drop a node onto a wire to auto-insert via node primary input/output
+  - double-click a wire to insert and splice an elbow node.
+- Connection retargeting to empty/incompatible space commits disconnection when a source edge was detached; `Esc` cancels active wire drag without mutation.
+- Session/runtime graph editing now includes explicit node removal and node bypass operations with undo/redo support and protected-node guards for canonical input/output nodes.
 - Viewer panel supports pan/zoom navigation with fit-to-image initialization.
 - Shell file cluster supports `New`, `Open`, `Save`, `Save As`, and `Export`.
 - Unsaved-change prompt flow is integrated for `New`, `Open`, and window close, with `Save`/`Discard`/`Cancel` decisions.

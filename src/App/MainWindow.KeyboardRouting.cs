@@ -14,6 +14,14 @@ public partial class MainWindow
             return;
         }
 
+        if (e.Key == Key.Escape && _isConnectionDragging)
+        {
+            ResetConnectionDragState();
+            SetStatus("Connection canceled.");
+            e.Handled = true;
+            return;
+        }
+
         if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
         {
             return;
@@ -21,6 +29,13 @@ public partial class MainWindow
 
         if (GetFocusedElement() is TextBox)
         {
+            return;
+        }
+
+        if (e.Key == Key.Delete)
+        {
+            DeleteSelectedNodeWithBypassReconnect();
+            e.Handled = true;
             return;
         }
 
@@ -71,6 +86,26 @@ public partial class MainWindow
             return;
         }
 
-        _editorSession.RequestPreviewRender();
+            _editorSession.RequestPreviewRender();
+    }
+
+    private void DeleteSelectedNodeWithBypassReconnect()
+    {
+        if (_selectedNodeId is not NodeId selectedNodeId ||
+            !_nodeLookup.TryGetValue(selectedNodeId, out var selectedNode))
+        {
+            return;
+        }
+
+        try
+        {
+            _editorSession.RemoveNode(selectedNodeId, reconnectPrimaryStream: true);
+            RefreshGraphBindings();
+            SetStatus($"Deleted node '{selectedNode.Type}' with reconnect.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"Delete failed: {exception.Message}");
+        }
     }
 }

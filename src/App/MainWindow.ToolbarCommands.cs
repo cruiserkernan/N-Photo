@@ -159,16 +159,43 @@ public partial class MainWindow
 
     private void AddNodeOfType(string nodeType)
     {
+        if (TryAddNodeOfTypeAtWorldPosition(
+                nodeType,
+                GetViewportCenterWorld(),
+                out _,
+                out var errorMessage))
+        {
+            SetStatus($"Node '{nodeType}' added.");
+            return;
+        }
+
+        SetStatus($"Add node failed: {errorMessage}");
+    }
+
+    private bool TryAddNodeOfTypeAtWorldPosition(
+        string nodeType,
+        Point worldPosition,
+        out NodeId nodeId,
+        out string errorMessage,
+        bool refreshBindings = true)
+    {
+        nodeId = default;
+        errorMessage = string.Empty;
         try
         {
-            var nodeId = _editorSession.AddNode(new NodeTypeId(nodeType));
-            _nodePositions[nodeId] = GetViewportCenterWorld();
-            RefreshGraphBindings();
-            SetStatus($"Node '{nodeType}' added.");
+            nodeId = _editorSession.AddNode(new NodeTypeId(nodeType));
+            _nodePositions[nodeId] = worldPosition;
+            if (refreshBindings)
+            {
+                RefreshGraphBindings();
+            }
+
+            return true;
         }
         catch (Exception exception)
         {
-            SetStatus($"Add node failed: {exception.Message}");
+            errorMessage = exception.Message;
+            return false;
         }
     }
 

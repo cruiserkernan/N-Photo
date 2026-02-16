@@ -59,4 +59,32 @@ public class GraphWireGeometryControllerTests
         Assert.Equal(new Vector(0, -16), inputTopOffset);
         Assert.Equal(new Vector(0, 10), outputBottomOffset);
     }
+
+    [Fact]
+    public void SegmentIntersectsRect_ReturnsTrue_WhenSegmentCrossesRect()
+    {
+        var intersects = GraphWireGeometryController.SegmentIntersectsRect(
+            new Point(0, 0),
+            new Point(20, 20),
+            new Rect(8, 8, 6, 6));
+
+        Assert.True(intersects);
+    }
+
+    [Fact]
+    public void SegmentIntersectsRect_UsesTolerance_ForNearMiss()
+    {
+        var noTolerance = GraphWireGeometryController.SegmentIntersectsRect(
+            new Point(0, 0),
+            new Point(10, 0),
+            new Rect(0, 2, 10, 4));
+        var withTolerance = GraphWireGeometryController.SegmentIntersectsRect(
+            new Point(0, 0),
+            new Point(10, 0),
+            new Rect(0, 2, 10, 4),
+            tolerance: 2.1);
+
+        Assert.False(noTolerance);
+        Assert.True(withTolerance);
+    }
 }

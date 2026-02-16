@@ -225,7 +225,15 @@ public partial class MainWindow
     {
         card.BorderBrush = _selectedNodeId == nodeId ? _nodeCardSelectedBorder : _nodeCardBorder;
         _activeDragNodeId = null;
+        var inserted = TryInsertDraggedNodeIntoWire(nodeId, out var attemptedInsert);
+        _hoverNodeInsertEdge = null;
+        RenderPortVisuals(_edgeSnapshot);
         OnPersistentStateMutated();
+
+        if (inserted || attemptedInsert)
+        {
+            return;
+        }
 
         if (_nodeLookup.TryGetValue(nodeId, out var node))
         {
@@ -273,21 +281,59 @@ public partial class MainWindow
 
     private double GetCardHeight(NodeId nodeId)
     {
+        var fallback = GetFallbackCardHeight(nodeId);
         if (!_nodeCards.TryGetValue(nodeId, out var card))
         {
-            return NodeCardHeight;
+            return fallback;
         }
 
-        return card.Bounds.Height > 0 ? card.Bounds.Height : NodeCardHeight;
+        if (card.Bounds.Height > 0)
+        {
+            return card.Bounds.Height;
+        }
+
+        if (!double.IsNaN(card.Height) && card.Height > 0)
+        {
+            return card.Height;
+        }
+
+        return fallback;
     }
 
     private double GetCardWidth(NodeId nodeId)
     {
+        var fallback = GetFallbackCardWidth(nodeId);
         if (!_nodeCards.TryGetValue(nodeId, out var card))
         {
-            return NodeCardWidth;
+            return fallback;
         }
 
-        return card.Bounds.Width > 0 ? card.Bounds.Width : NodeCardWidth;
+        if (card.Bounds.Width > 0)
+        {
+            return card.Bounds.Width;
+        }
+
+        if (!double.IsNaN(card.Width) && card.Width > 0)
+        {
+            return card.Width;
+        }
+
+        return fallback;
+    }
+
+    private double GetFallbackCardHeight(NodeId nodeId)
+    {
+        return _nodeLookup.TryGetValue(nodeId, out var node) &&
+               string.Equals(node.Type, NodeTypes.Elbow, StringComparison.Ordinal)
+            ? ElbowNodeDiameter
+            : NodeCardHeight;
+    }
+
+    private double GetFallbackCardWidth(NodeId nodeId)
+    {
+        return _nodeLookup.TryGetValue(nodeId, out var node) &&
+               string.Equals(node.Type, NodeTypes.Elbow, StringComparison.Ordinal)
+            ? ElbowNodeDiameter
+            : NodeCardWidth;
     }
 }

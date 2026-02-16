@@ -154,6 +154,107 @@ public class EditorEngineTests
         Assert.InRange(pixel.B, 0.29f, 0.31f);
     }
 
+    [Fact]
+    public void RemoveNode_WithPrimaryReconnect_BypassesAndRemovesNode()
+    {
+        var engine = new BootstrapEditorEngine();
+        var transform = engine.AddNode(NodeTypes.Transform);
+        var exposure = engine.AddNode(NodeTypes.ExposureContrast);
+        var blur = engine.AddNode(NodeTypes.Blur);
+        var maskInput = engine.AddNode(NodeTypes.ImageInput);
+
+        engine.Connect(engine.InputNodeId, NodePortNames.Image, transform, NodePortNames.Image);
+        engine.Connect(maskInput, NodePortNames.Image, transform, NodePortNames.Mask);
+        engine.Connect(transform, NodePortNames.Image, exposure, NodePortNames.Image);
+        engine.Connect(transform, NodePortNames.Image, blur, NodePortNames.Image);
+
+        engine.RemoveNode(transform, reconnectPrimaryStream: true);
+
+        Assert.DoesNotContain(engine.Nodes, node => node.Id == transform);
+        Assert.DoesNotContain(engine.Edges, edge => edge.FromNodeId == transform || edge.ToNodeId == transform);
+        Assert.Contains(engine.Edges, edge =>
+            edge.FromNodeId == engine.InputNodeId &&
+            edge.ToNodeId == exposure &&
+            edge.FromPort == NodePortNames.Image &&
+            edge.ToPort == NodePortNames.Image);
+        Assert.Contains(engine.Edges, edge =>
+            edge.FromNodeId == engine.InputNodeId &&
+            edge.ToNodeId == blur &&
+            edge.FromPort == NodePortNames.Image &&
+            edge.ToPort == NodePortNames.Image);
+    }
+
+    [Fact]
+    public void BypassNodePrimaryStream_ReconnectsEdges_AndKeepsNode()
+    {
+        var engine = new BootstrapEditorEngine();
+        var transform = engine.AddNode(NodeTypes.Transform);
+        var exposure = engine.AddNode(NodeTypes.ExposureContrast);
+        var maskInput = engine.AddNode(NodeTypes.ImageInput);
+
+        engine.Connect(engine.InputNodeId, NodePortNames.Image, transform, NodePortNames.Image);
+        engine.Connect(maskInput, NodePortNames.Image, transform, NodePortNames.Mask);
+        engine.Connect(transform, NodePortNames.Image, exposure, NodePortNames.Image);
+
+        engine.BypassNodePrimaryStream(transform);
+
+        Assert.Contains(engine.Nodes, node => node.Id == transform);
+        Assert.DoesNotContain(engine.Edges, edge => edge.FromNodeId == transform || edge.ToNodeId == transform);
+        Assert.Contains(engine.Edges, edge =>
+            edge.FromNodeId == engine.InputNodeId &&
+            edge.FromPort == NodePortNames.Image &&
+            edge.ToNodeId == exposure &&
+            edge.ToPort == NodePortNames.Image);
+    }
+
+    [Fact]
+    public void RemoveAndBypass_CommandsSupportUndoRedo()
+    {
+        var engine = new BootstrapEditorEngine();
+        var transform = engine.AddNode(NodeTypes.Transform);
+        var exposure = engine.AddNode(NodeTypes.ExposureContrast);
+        engine.Connect(engine.InputNodeId, NodePortNames.Image, transform, NodePortNames.Image);
+        engine.Connect(transform, NodePortNames.Image, exposure, NodePortNames.Image);
+
+        engine.BypassNodePrimaryStream(transform);
+        Assert.DoesNotContain(engine.Edges, edge => edge.FromNodeId == transform || edge.ToNodeId == transform);
+
+        engine.Undo();
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == engine.InputNodeId && edge.ToNodeId == transform);
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == transform && edge.ToNodeId == exposure);
+
+        engine.Redo();
+        Assert.DoesNotContain(engine.Edges, edge => edge.FromNodeId == transform || edge.ToNodeId == transform);
+
+        engine.Undo();
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == engine.InputNodeId && edge.ToNodeId == transform);
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == transform && edge.ToNodeId == exposure);
+
+        engine.RemoveNode(transform, reconnectPrimaryStream: true);
+        Assert.DoesNotContain(engine.Nodes, node => node.Id == transform);
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == engine.InputNodeId && edge.ToNodeId == exposure);
+
+        engine.Undo();
+        Assert.Contains(engine.Nodes, node => node.Id == transform);
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == engine.InputNodeId && edge.ToNodeId == transform);
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == transform && edge.ToNodeId == exposure);
+
+        engine.Redo();
+        Assert.DoesNotContain(engine.Nodes, node => node.Id == transform);
+        Assert.Contains(engine.Edges, edge => edge.FromNodeId == engine.InputNodeId && edge.ToNodeId == exposure);
+    }
+
+    [Fact]
+    public void RemoveAndBypass_RejectProtectedInputOutputNodes()
+    {
+        var engine = new BootstrapEditorEngine();
+
+        Assert.Throws<InvalidOperationException>(() => engine.RemoveNode(engine.InputNodeId, reconnectPrimaryStream: true));
+        Assert.Throws<InvalidOperationException>(() => engine.RemoveNode(engine.OutputNodeId, reconnectPrimaryStream: true));
+        Assert.Throws<InvalidOperationException>(() => engine.BypassNodePrimaryStream(engine.InputNodeId));
+        Assert.Throws<InvalidOperationException>(() => engine.BypassNodePrimaryStream(engine.OutputNodeId));
+    }
+
     private static RgbaImage CreateSolidImage(int width, int height, RgbaColor color)
     {
         var image = new RgbaImage(width, height);

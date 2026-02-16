@@ -24,6 +24,8 @@ public interface IEditorEngine
     NodeId OutputNodeId { get; }
 
     NodeId AddNode(string nodeType);
+    void RemoveNode(NodeId nodeId, bool reconnectPrimaryStream = false);
+    void BypassNodePrimaryStream(NodeId nodeId);
 
     void Connect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort);
     void Disconnect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort);

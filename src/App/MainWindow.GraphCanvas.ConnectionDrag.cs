@@ -15,8 +15,28 @@ public partial class MainWindow
             return false;
         }
 
-        if (!TryFindNearestCompatiblePort(source, pointerScreen, out var target, out _))
+        if (!TryResolveConnectionDropTarget(source, pointerScreen, out var target, out _))
         {
+            if (_activeConnectionDetachedEdge is Edge detachedToDisconnect)
+            {
+                try
+                {
+                    _editorSession.Disconnect(
+                        detachedToDisconnect.FromNodeId,
+                        detachedToDisconnect.FromPort,
+                        detachedToDisconnect.ToNodeId,
+                        detachedToDisconnect.ToPort);
+                    RefreshGraphBindings();
+                    SetStatus($"Disconnected {detachedToDisconnect.FromPort} -> {detachedToDisconnect.ToPort}");
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    SetStatus($"Disconnect failed: {exception.Message}");
+                    return false;
+                }
+            }
+
             SetStatus("Connection canceled.");
             return false;
         }
@@ -31,6 +51,7 @@ public partial class MainWindow
             return true;
         }
 
+        var detached = false;
         try
         {
             if (_activeConnectionDetachedEdge is Edge edgeToDetach)
@@ -40,6 +61,7 @@ public partial class MainWindow
                     edgeToDetach.FromPort,
                     edgeToDetach.ToNodeId,
                     edgeToDetach.ToPort);
+                detached = true;
             }
 
             _editorSession.Connect(newEdge.FromNodeId, newEdge.FromPort, newEdge.ToNodeId, newEdge.ToPort);
@@ -49,7 +71,7 @@ public partial class MainWindow
         }
         catch (Exception exception)
         {
-            if (_activeConnectionDetachedEdge is Edge edgeToRestore)
+            if (detached && _activeConnectionDetachedEdge is Edge edgeToRestore)
             {
                 try
                 {
@@ -146,6 +168,101 @@ public partial class MainWindow
         }
 
         return found;
+    }
+
+    private bool TryResolveConnectionDropTarget(
+        PortKey sourcePort,
+        Point pointerScreen,
+        out PortKey targetPort,
+        out Point targetAnchor)
+    {
+        if (TryFindNearestCompatiblePort(sourcePort, pointerScreen, out targetPort, out targetAnchor))
+        {
+            return true;
+        }
+
+        return TryFindNodeBodyCompatiblePort(sourcePort, pointerScreen, out targetPort, out targetAnchor);
+    }
+
+    private bool TryFindNodeBodyCompatiblePort(
+        PortKey sourcePort,
+        Point pointerScreen,
+        out PortKey targetPort,
+        out Point targetAnchor)
+    {
+        targetPort = default;
+        targetAnchor = default;
+
+        var pointerWorld = ScreenToWorld(pointerScreen);
+        var worldPadding = NodeBodyDropPaddingPixels / Math.Max(0.001, _zoomScale);
+        var nearestDistance = double.MaxValue;
+        var found = false;
+        foreach (var node in _nodeLookup.Values)
+        {
+            if (node.Id == sourcePort.NodeId ||
+                !TryResolveNodeBodyTargetPort(node, sourcePort, out var candidatePort))
+            {
+                continue;
+            }
+
+            if (!TryGetNodeBodyRect(node.Id, worldPadding, out var nodeRect) ||
+                !nodeRect.Contains(pointerWorld))
+            {
+                continue;
+            }
+
+            if (!TryGetNodeCenter(node.Id, out var center))
+            {
+                continue;
+            }
+
+            var dx = center.X - pointerWorld.X;
+            var dy = center.Y - pointerWorld.Y;
+            var distance = Math.Sqrt((dx * dx) + (dy * dy));
+            if (distance >= nearestDistance)
+            {
+                continue;
+            }
+
+            nearestDistance = distance;
+            found = true;
+            targetPort = candidatePort;
+            if (!TryResolveNodeBorderAnchor(candidatePort.NodeId, pointerWorld, out targetAnchor) &&
+                !TryGetPortAnchor(candidatePort, out targetAnchor))
+            {
+                targetAnchor = center;
+            }
+        }
+
+        return found;
+    }
+
+    private bool TryResolveNodeBodyTargetPort(Node node, PortKey sourcePort, out PortKey targetPort)
+    {
+        targetPort = default;
+        var nodeType = _editorSession.GetNodeTypeDefinition(node.Type);
+        if (sourcePort.Direction == PortDirection.Output)
+        {
+            var defaultInput = nodeType.Inputs
+                                   .FirstOrDefault(input => input.Role != NodePortRole.Mask)
+                               ?? nodeType.Inputs.FirstOrDefault();
+            if (defaultInput is null)
+            {
+                return false;
+            }
+
+            targetPort = new PortKey(node.Id, defaultInput.Name, PortDirection.Input);
+            return true;
+        }
+
+        var output = nodeType.Outputs.FirstOrDefault();
+        if (output is null)
+        {
+            return false;
+        }
+
+        targetPort = new PortKey(node.Id, output.Name, PortDirection.Output);
+        return true;
     }
 
     private bool TryFindPortLineGrabTarget(Point pointerScreen, out PortLineGrabTarget target)
@@ -319,6 +436,323 @@ public partial class MainWindow
         return first.Direction == PortDirection.Output
             ? (first, second)
             : (second, first);
+    }
+
+    private void UpdateDraggedNodeWireHover(NodeId nodeId)
+    {
+        if (TryFindBestEdgeForNodeInsert(nodeId, out var edge))
+        {
+            _hoverNodeInsertEdge = edge;
+            return;
+        }
+
+        _hoverNodeInsertEdge = null;
+    }
+
+    private bool IsPointerInsideNodeBody(NodeId nodeId, Point pointerScreen)
+    {
+        if (!TryGetNodeBodyRect(nodeId, paddingWorld: 0, out var nodeRect))
+        {
+            return false;
+        }
+
+        return nodeRect.Contains(ScreenToWorld(pointerScreen));
+    }
+
+    private bool TryGetNodeBodyRect(NodeId nodeId, double paddingWorld, out Rect rect)
+    {
+        rect = default;
+        if (!_nodePositions.TryGetValue(nodeId, out var position))
+        {
+            return false;
+        }
+
+        var width = GetCardWidth(nodeId);
+        var height = GetCardHeight(nodeId);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        rect = new Rect(position.X - paddingWorld, position.Y - paddingWorld, width + (paddingWorld * 2), height + (paddingWorld * 2));
+        return true;
+    }
+
+    private bool TryFindNearestEdgeAtPointer(
+        Point pointerScreen,
+        double maxDistancePixels,
+        out Edge hitEdge,
+        out double hitDistancePixels)
+    {
+        hitEdge = default!;
+        hitDistancePixels = double.MaxValue;
+        var found = false;
+        foreach (var edge in _edgeSnapshot)
+        {
+            var outputPort = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
+            var inputPort = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
+            if (!TryResolveConnectedLineAnchors(outputPort, inputPort, out var outputAnchor, out var inputAnchor))
+            {
+                continue;
+            }
+
+            var outputAnchorScreen = WorldToScreen(outputAnchor);
+            var inputAnchorScreen = WorldToScreen(inputAnchor);
+            var distance = GraphWireGeometryController.ComputeDistanceToSegment(pointerScreen, outputAnchorScreen, inputAnchorScreen);
+            if (distance > maxDistancePixels || distance >= hitDistancePixels)
+            {
+                continue;
+            }
+
+            found = true;
+            hitDistancePixels = distance;
+            hitEdge = edge;
+        }
+
+        return found;
+    }
+
+    private bool TryFindBestEdgeForNodeInsert(NodeId nodeId, out Edge hitEdge)
+    {
+        hitEdge = default!;
+        if (!TryGetNodeBodyRect(
+                nodeId,
+                NodeInsertEdgeBoundsTolerancePixels / Math.Max(0.001, _zoomScale),
+                out var nodeBounds))
+        {
+            return false;
+        }
+
+        var nodeCenterWorld = new Point(nodeBounds.X + (nodeBounds.Width / 2), nodeBounds.Y + (nodeBounds.Height / 2));
+        var nodeCenterScreen = WorldToScreen(nodeCenterWorld);
+        var nearestDistance = double.MaxValue;
+        var found = false;
+
+        foreach (var edge in _edgeSnapshot)
+        {
+            if (edge.FromNodeId == nodeId || edge.ToNodeId == nodeId)
+            {
+                continue;
+            }
+
+            var outputPort = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
+            var inputPort = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
+            if (!TryResolveConnectedLineAnchors(outputPort, inputPort, out var outputAnchor, out var inputAnchor) ||
+                !GraphWireGeometryController.SegmentIntersectsRect(outputAnchor, inputAnchor, nodeBounds))
+            {
+                continue;
+            }
+
+            var outputAnchorScreen = WorldToScreen(outputAnchor);
+            var inputAnchorScreen = WorldToScreen(inputAnchor);
+            var distance = GraphWireGeometryController.ComputeDistanceToSegment(nodeCenterScreen, outputAnchorScreen, inputAnchorScreen);
+            if (distance >= nearestDistance)
+            {
+                continue;
+            }
+
+            nearestDistance = distance;
+            hitEdge = edge;
+            found = true;
+        }
+
+        return found;
+    }
+
+    private bool TryInsertDraggedNodeIntoWire(NodeId nodeId, out bool attempted)
+    {
+        attempted = false;
+        if (!_nodeLookup.TryGetValue(nodeId, out var node) ||
+            !TryGetPrimaryPorts(node.Type, out var primaryInput, out var primaryOutput))
+        {
+            return false;
+        }
+
+        Edge? candidateEdge = _hoverNodeInsertEdge;
+        if (candidateEdge is null ||
+            candidateEdge.FromNodeId == nodeId ||
+            candidateEdge.ToNodeId == nodeId)
+        {
+            if (!TryFindBestEdgeForNodeInsert(nodeId, out var fallbackEdge))
+            {
+                return false;
+            }
+
+            candidateEdge = fallbackEdge;
+        }
+
+        attempted = true;
+        if (TrySpliceNodeIntoEdge(
+                nodeId,
+                primaryInput,
+                primaryOutput,
+                candidateEdge,
+                $"Inserted '{node.Type}' on wire."))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryInsertElbowNodeAtWire(Point pointerScreen)
+    {
+        if (!TryFindNearestEdgeAtPointer(pointerScreen, NodeInsertEdgeDistancePixels, out var hitEdge, out _))
+        {
+            return false;
+        }
+
+        if (!TryGetPrimaryPorts(NodeTypes.Elbow, out var inputPort, out var outputPort))
+        {
+            SetStatus("Elbow node has no primary ports.");
+            return false;
+        }
+
+        var pointerWorld = ScreenToWorld(pointerScreen);
+        var elbowPosition = new Point(
+            pointerWorld.X - (ElbowNodeDiameter / 2),
+            pointerWorld.Y - (ElbowNodeDiameter / 2));
+        if (!TryAddNodeOfTypeAtWorldPosition(
+                NodeTypes.Elbow,
+                elbowPosition,
+                out var elbowNodeId,
+                out var addError,
+                refreshBindings: false))
+        {
+            SetStatus($"Elbow insert failed: {addError}");
+            return false;
+        }
+
+        if (TrySpliceNodeIntoEdge(
+                elbowNodeId,
+                inputPort,
+                outputPort,
+                hitEdge,
+                "Inserted elbow on wire."))
+        {
+            return true;
+        }
+
+        try
+        {
+            _editorSession.RemoveNode(elbowNodeId, reconnectPrimaryStream: false);
+            RefreshGraphBindings();
+        }
+        catch
+        {
+            RefreshGraphBindings();
+        }
+
+        return false;
+    }
+
+    private bool TrySpliceNodeIntoEdge(
+        NodeId nodeId,
+        string primaryInputPort,
+        string primaryOutputPort,
+        Edge edgeToReplace,
+        string successStatus)
+    {
+        var existingPrimaryInput = _edgeSnapshot.FirstOrDefault(edge =>
+            edge.ToNodeId == nodeId &&
+            string.Equals(edge.ToPort, primaryInputPort, StringComparison.Ordinal));
+
+        var disconnectedPrimaryInput = false;
+        var disconnectedEdgeToReplace = false;
+        var connectedUpstreamToNode = false;
+        var connectedNodeToTarget = false;
+        try
+        {
+            _editorSession.Disconnect(
+                edgeToReplace.FromNodeId,
+                edgeToReplace.FromPort,
+                edgeToReplace.ToNodeId,
+                edgeToReplace.ToPort);
+            disconnectedEdgeToReplace = true;
+
+            if (existingPrimaryInput is Edge inputEdge && !inputEdge.Equals(edgeToReplace))
+            {
+                _editorSession.Disconnect(
+                    inputEdge.FromNodeId,
+                    inputEdge.FromPort,
+                    inputEdge.ToNodeId,
+                    inputEdge.ToPort);
+                disconnectedPrimaryInput = true;
+            }
+
+            _editorSession.Connect(
+                edgeToReplace.FromNodeId,
+                edgeToReplace.FromPort,
+                nodeId,
+                primaryInputPort);
+            connectedUpstreamToNode = true;
+
+            _editorSession.Connect(
+                nodeId,
+                primaryOutputPort,
+                edgeToReplace.ToNodeId,
+                edgeToReplace.ToPort);
+            connectedNodeToTarget = true;
+
+            RefreshGraphBindings();
+            SetStatus(successStatus);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                if (connectedNodeToTarget)
+                {
+                    _editorSession.Disconnect(nodeId, primaryOutputPort, edgeToReplace.ToNodeId, edgeToReplace.ToPort);
+                }
+
+                if (connectedUpstreamToNode)
+                {
+                    _editorSession.Disconnect(edgeToReplace.FromNodeId, edgeToReplace.FromPort, nodeId, primaryInputPort);
+                }
+
+                if (disconnectedPrimaryInput && existingPrimaryInput is Edge inputEdge)
+                {
+                    _editorSession.Connect(inputEdge.FromNodeId, inputEdge.FromPort, inputEdge.ToNodeId, inputEdge.ToPort);
+                }
+
+                if (disconnectedEdgeToReplace)
+                {
+                    _editorSession.Connect(
+                        edgeToReplace.FromNodeId,
+                        edgeToReplace.FromPort,
+                        edgeToReplace.ToNodeId,
+                        edgeToReplace.ToPort);
+                }
+            }
+            catch
+            {
+                // Best-effort rollback only.
+            }
+
+            RefreshGraphBindings();
+            SetStatus($"Wire insert failed: {exception.Message}");
+            return false;
+        }
+    }
+
+    private bool TryGetPrimaryPorts(string nodeType, out string inputPort, out string outputPort)
+    {
+        inputPort = string.Empty;
+        outputPort = string.Empty;
+
+        var nodeDefinition = _editorSession.GetNodeTypeDefinition(nodeType);
+        var input = nodeDefinition.Inputs.FirstOrDefault();
+        var output = nodeDefinition.Outputs.FirstOrDefault();
+        if (input is null || output is null)
+        {
+            return false;
+        }
+
+        inputPort = input.Name;
+        outputPort = output.Name;
+        return true;
     }
 
     private bool TryGetPortAnchor(PortKey key, out Point anchor)

@@ -21,6 +21,16 @@ public sealed class WorkspaceController
         return _session.AddNode(nodeTypeId);
     }
 
+    public void RemoveNode(NodeId nodeId, bool reconnectPrimaryStream = false)
+    {
+        _session.RemoveNode(nodeId, reconnectPrimaryStream);
+    }
+
+    public void BypassNodePrimaryStream(NodeId nodeId)
+    {
+        _session.BypassNodePrimaryStream(nodeId);
+    }
+
     public void Connect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort)
     {
         _session.Connect(fromNodeId, fromPort, toNodeId, toPort);

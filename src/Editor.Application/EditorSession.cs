@@ -48,6 +48,16 @@ public sealed class EditorSession : IEditorSession, IDisposable
         return _engine.AddNode(nodeTypeId.Value);
     }
 
+    public void RemoveNode(NodeId nodeId, bool reconnectPrimaryStream = false)
+    {
+        _engine.RemoveNode(nodeId, reconnectPrimaryStream);
+    }
+
+    public void BypassNodePrimaryStream(NodeId nodeId)
+    {
+        _engine.BypassNodePrimaryStream(nodeId);
+    }
+
     public void Connect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort)
     {
         _engine.Connect(fromNodeId, fromPort, toNodeId, toPort);

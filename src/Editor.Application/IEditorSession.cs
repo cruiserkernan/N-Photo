@@ -14,6 +14,8 @@ public interface IEditorSession
     NodeTypeDefinition GetNodeTypeDefinition(string nodeType);
 
     NodeId AddNode(NodeTypeId nodeTypeId);
+    void RemoveNode(NodeId nodeId, bool reconnectPrimaryStream = false);
+    void BypassNodePrimaryStream(NodeId nodeId);
 
     void Connect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort);
     void Disconnect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort);

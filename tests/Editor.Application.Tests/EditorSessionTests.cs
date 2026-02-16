@@ -59,6 +59,30 @@ public class EditorSessionTests
         Assert.Equal(baseline.Edges, restored.Edges);
     }
 
+    [Fact]
+    public void RemoveNode_AndBypassNodePrimaryStream_AreExposedBySession()
+    {
+        var registry = new BuiltInNodeModuleRegistry();
+        var engine = new BootstrapEditorEngine(registry);
+        var session = new EditorSession(engine, registry);
+        var transform = session.AddNode(new NodeTypeId(NodeTypes.Transform));
+        var exposure = session.AddNode(new NodeTypeId(NodeTypes.ExposureContrast));
+
+        session.Connect(engine.InputNodeId, NodePortNames.Image, transform, NodePortNames.Image);
+        session.Connect(transform, NodePortNames.Image, exposure, NodePortNames.Image);
+
+        session.BypassNodePrimaryStream(transform);
+
+        var bypassed = session.GetSnapshot();
+        Assert.Contains(bypassed.Nodes, node => node.Id == transform);
+        Assert.DoesNotContain(bypassed.Edges, edge => edge.FromNodeId == transform || edge.ToNodeId == transform);
+        Assert.Contains(bypassed.Edges, edge => edge.FromNodeId == engine.InputNodeId && edge.ToNodeId == exposure);
+
+        session.RemoveNode(transform, reconnectPrimaryStream: true);
+        var removed = session.GetSnapshot();
+        Assert.DoesNotContain(removed.Nodes, node => node.Id == transform);
+    }
+
     private static string CreateGraphNodeSignature(GraphNodeState node)
     {
         var parameterSignature = string.Join(

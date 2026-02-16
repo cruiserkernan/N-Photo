@@ -130,11 +130,69 @@ public static class GraphWireGeometryController
         return Math.Sqrt((deltaX * deltaX) + (deltaY * deltaY));
     }
 
+    public static bool SegmentIntersectsRect(Point segmentStart, Point segmentEnd, Rect rect, double tolerance = 0)
+    {
+        var expanded = tolerance > 0
+            ? rect.Inflate(tolerance)
+            : rect;
+        if (expanded.Width <= 0 || expanded.Height <= 0)
+        {
+            return false;
+        }
+
+        if (expanded.Contains(segmentStart) || expanded.Contains(segmentEnd))
+        {
+            return true;
+        }
+
+        var topLeft = expanded.TopLeft;
+        var topRight = new Point(expanded.Right, expanded.Top);
+        var bottomLeft = new Point(expanded.Left, expanded.Bottom);
+        var bottomRight = expanded.BottomRight;
+
+        return SegmentsIntersect(segmentStart, segmentEnd, topLeft, topRight) ||
+               SegmentsIntersect(segmentStart, segmentEnd, topRight, bottomRight) ||
+               SegmentsIntersect(segmentStart, segmentEnd, bottomRight, bottomLeft) ||
+               SegmentsIntersect(segmentStart, segmentEnd, bottomLeft, topLeft);
+    }
+
     public static Vector ResolvePortTipOffset(GraphPortSide side, PortDirection direction)
     {
         var geometry = ResolvePortGlyphGeometry(side, direction);
         return new Vector(
             geometry.TipPoint.X - geometry.EdgePoint.X,
             geometry.TipPoint.Y - geometry.EdgePoint.Y);
+    }
+
+    private static bool SegmentsIntersect(Point a1, Point a2, Point b1, Point b2)
+    {
+        var orientation1 = Orientation(a1, a2, b1);
+        var orientation2 = Orientation(a1, a2, b2);
+        var orientation3 = Orientation(b1, b2, a1);
+        var orientation4 = Orientation(b1, b2, a2);
+
+        if ((orientation1 > 0 && orientation2 < 0 || orientation1 < 0 && orientation2 > 0) &&
+            (orientation3 > 0 && orientation4 < 0 || orientation3 < 0 && orientation4 > 0))
+        {
+            return true;
+        }
+
+        return Math.Abs(orientation1) < 0.0001 && IsOnSegment(a1, b1, a2) ||
+               Math.Abs(orientation2) < 0.0001 && IsOnSegment(a1, b2, a2) ||
+               Math.Abs(orientation3) < 0.0001 && IsOnSegment(b1, a1, b2) ||
+               Math.Abs(orientation4) < 0.0001 && IsOnSegment(b1, a2, b2);
+    }
+
+    private static double Orientation(Point a, Point b, Point c)
+    {
+        return ((b.X - a.X) * (c.Y - a.Y)) - ((b.Y - a.Y) * (c.X - a.X));
+    }
+
+    private static bool IsOnSegment(Point segmentStart, Point point, Point segmentEnd)
+    {
+        return point.X <= Math.Max(segmentStart.X, segmentEnd.X) + 0.0001 &&
+               point.X >= Math.Min(segmentStart.X, segmentEnd.X) - 0.0001 &&
+               point.Y <= Math.Max(segmentStart.Y, segmentEnd.Y) + 0.0001 &&
+               point.Y >= Math.Min(segmentStart.Y, segmentEnd.Y) - 0.0001;
     }
 }

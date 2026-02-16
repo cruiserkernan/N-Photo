@@ -143,6 +143,30 @@ public sealed class BootstrapEditorEngine : IEditorEngine, IDisposable
         }
     }
 
+    public void RemoveNode(NodeId nodeId, bool reconnectPrimaryStream = false)
+    {
+        lock (_sync)
+        {
+            EnsureNodeCanBeBypassedOrRemoved(nodeId);
+            _commandProcessor.Execute(new RemoveNodeCommand(nodeId, reconnectPrimaryStream));
+            Status = reconnectPrimaryStream
+                ? $"Node '{nodeId}' removed with primary-stream reconnect"
+                : $"Node '{nodeId}' removed";
+            RequestPreviewRenderLocked(null);
+        }
+    }
+
+    public void BypassNodePrimaryStream(NodeId nodeId)
+    {
+        lock (_sync)
+        {
+            EnsureNodeCanBeBypassedOrRemoved(nodeId);
+            _commandProcessor.Execute(new BypassNodePrimaryStreamCommand(nodeId));
+            Status = $"Node '{nodeId}' bypassed";
+            RequestPreviewRenderLocked(null);
+        }
+    }
+
     public void Connect(NodeId fromNodeId, string fromPort, NodeId toNodeId, string toPort)
     {
         lock (_sync)
@@ -398,6 +422,19 @@ public sealed class BootstrapEditorEngine : IEditorEngine, IDisposable
             _inputImageStore.Snapshot(),
             _tileCache,
             cancellationToken);
+    }
+
+    private void EnsureNodeCanBeBypassedOrRemoved(NodeId nodeId)
+    {
+        if (!_graph.ContainsNode(nodeId))
+        {
+            throw new InvalidOperationException($"Node '{nodeId}' does not exist.");
+        }
+
+        if (nodeId == InputNodeId || nodeId == OutputNodeId)
+        {
+            throw new InvalidOperationException("Input and Output nodes are protected and cannot be removed or bypassed.");
+        }
     }
 
     private GraphDocumentState ValidateDocumentState(GraphDocumentState document)

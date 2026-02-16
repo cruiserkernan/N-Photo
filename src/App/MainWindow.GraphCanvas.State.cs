@@ -33,6 +33,10 @@ public partial class MainWindow
     private const double PortLineGrabLength = 30;
     private const double ConnectedLineGrabLength = 44;
     private const double ElbowNodeDiameter = 24;
+    private const double NodeBodyDropPaddingPixels = 20;
+    private const double NodeInsertEdgeDistancePixels = 10;
+    private const double NodeInsertEdgeBoundsTolerancePixels = 6;
+    private const double HoverWireThickness = 4;
 
     private IBrush _nodeCardBackground = Brushes.Transparent;
     private IBrush _nodeCardBorder = Brushes.Transparent;
@@ -64,6 +68,7 @@ public partial class MainWindow
     private Edge? _activeConnectionDetachedEdge;
     private PortKey? _hoverConnectionTarget;
     private Point? _hoverConnectionTargetAnchor;
+    private Edge? _hoverNodeInsertEdge;
     private Point _activeConnectionPointerWorld;
     private bool _isPanningCanvas;
     private bool _isConnectionDragging;
@@ -100,6 +105,7 @@ public partial class MainWindow
         var nodes = snapshot.Nodes;
         var edges = snapshot.Edges;
         _edgeSnapshot = edges;
+        _hoverNodeInsertEdge = null;
 
         _nodeLookup.Clear();
         foreach (var node in nodes)
@@ -190,12 +196,14 @@ public partial class MainWindow
         _wireVisuals.Clear();
 
         var inputToOutput = new Dictionary<PortKey, PortKey>();
+        var inputEdgeLookup = new Dictionary<PortKey, Edge>();
         var connectedOutputs = new HashSet<PortKey>();
         foreach (var edge in edges)
         {
             var inputKey = new PortKey(edge.ToNodeId, edge.ToPort, PortDirection.Input);
             var outputKey = new PortKey(edge.FromNodeId, edge.FromPort, PortDirection.Output);
             inputToOutput[inputKey] = outputKey;
+            inputEdgeLookup[inputKey] = edge;
             connectedOutputs.Add(outputKey);
         }
 
@@ -277,6 +285,13 @@ public partial class MainWindow
                         ? outputTip
                         : tipAnchor;
                 }
+
+                if (_hoverNodeInsertEdge is Edge hoverEdge &&
+                    inputEdgeLookup.TryGetValue(key, out var renderedEdge) &&
+                    renderedEdge.Equals(hoverEdge))
+                {
+                    stroke = _portBorderHover;
+                }
             }
             else
             {
@@ -299,7 +314,11 @@ public partial class MainWindow
                 StartPoint = farEnd,
                 EndPoint = baseAnchor,
                 Stroke = stroke,
-                StrokeThickness = WireThickness,
+                StrokeThickness = _hoverNodeInsertEdge is Edge hoverEdgeForThickness &&
+                                  inputEdgeLookup.TryGetValue(key, out var renderedEdgeForThickness) &&
+                                  renderedEdgeForThickness.Equals(hoverEdgeForThickness)
+                    ? HoverWireThickness
+                    : WireThickness,
                 StrokeLineCap = PenLineCap.Round,
                 Opacity = opacity
             };

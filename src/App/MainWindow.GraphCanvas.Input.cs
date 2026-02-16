@@ -11,12 +11,18 @@ public partial class MainWindow
     private void OnPortHandlePressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Border handle ||
+            handle.Tag is not PortKey key ||
             !e.GetCurrentPoint(handle).Properties.IsLeftButtonPressed)
         {
             return;
         }
 
         var pointerScreen = e.GetPosition(NodeCanvas);
+        if (IsPointerInsideNodeBody(key.NodeId, pointerScreen))
+        {
+            return;
+        }
+
         if (!TryFindPortLineGrabTarget(pointerScreen, out var lineTarget))
         {
             return;
@@ -49,6 +55,13 @@ public partial class MainWindow
         if (pointerPoint.Properties.IsLeftButtonPressed && isBackgroundHit)
         {
             var pointerScreen = e.GetPosition(NodeCanvas);
+            if (e.ClickCount >= 2 && TryInsertElbowNodeAtWire(pointerScreen))
+            {
+                NodeCanvas.Focus();
+                e.Handled = true;
+                return;
+            }
+
             if (TryFindPortLineGrabTarget(pointerScreen, out var lineTarget))
             {
                 var dragTarget = ResolveLineGrabTargetWithModifiers(lineTarget, e.KeyModifiers);
@@ -83,19 +96,14 @@ public partial class MainWindow
         }
 
         var pointerScreen = e.GetPosition(NodeCanvas);
-        if (TryFindPortLineGrabTarget(pointerScreen, out var lineTarget))
-        {
-            var dragTarget = ResolveLineGrabTargetWithModifiers(lineTarget, e.KeyModifiers);
-            BeginConnectionDrag(dragTarget.SourcePort, pointerScreen, dragTarget.DetachedEdge);
-            NodeCanvas.Focus();
-            e.Pointer.Capture(NodeCanvas);
-            RenderPortVisuals(_edgeSnapshot);
-            e.Handled = true;
-            return;
-        }
-
         SetSelectedNode(nodeId);
         NodeCanvas.Focus();
+        _hoverNodeInsertEdge = null;
+
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0)
+        {
+            TryBypassNodeForCtrlDrag(nodeId);
+        }
 
         var pointerPosition = ScreenToWorld(pointerScreen);
         var currentPosition = GetNodeCardPosition(card);
@@ -125,6 +133,7 @@ public partial class MainWindow
 
         _nodePositions[nodeId] = worldPosition;
         SetNodeCardPosition(card, worldPosition);
+        UpdateDraggedNodeWireHover(nodeId);
         RenderPortVisuals(_edgeSnapshot);
         e.Handled = true;
     }
@@ -197,7 +206,7 @@ public partial class MainWindow
             var pointerScreen = e.GetPosition(NodeCanvas);
             _activeConnectionPointerWorld = ScreenToWorld(pointerScreen);
             if (_activeConnectionSource is PortKey source &&
-                TryFindNearestCompatiblePort(source, pointerScreen, out var target, out var targetAnchor))
+                TryResolveConnectionDropTarget(source, pointerScreen, out var target, out var targetAnchor))
             {
                 _hoverConnectionTarget = target;
                 _hoverConnectionTargetAnchor = targetAnchor;
@@ -286,5 +295,25 @@ public partial class MainWindow
         _panOffset = nextPan;
         ApplyGraphTransform();
         e.Handled = true;
+    }
+
+    private void TryBypassNodeForCtrlDrag(NodeId nodeId)
+    {
+        try
+        {
+            _editorSession.BypassNodePrimaryStream(nodeId);
+            var snapshot = _editorSession.GetSnapshot();
+            _edgeSnapshot = snapshot.Edges;
+            UndoButton.IsEnabled = snapshot.CanUndo;
+            RedoButton.IsEnabled = snapshot.CanRedo;
+            _hoverNodeInsertEdge = null;
+            RenderPortVisuals(_edgeSnapshot);
+            OnPersistentStateMutated();
+            SetStatus("Node bypassed for drag.");
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"Bypass failed: {exception.Message}");
+        }
     }
 }
